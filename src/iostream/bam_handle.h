@@ -67,7 +67,16 @@ public:
   void load_index(const std::string &index_path = "");
   void query_from_region(const char *region) override;
   void query_from_region(int tid, int64_t start, int64_t end) override;
-  void query_from_multi_region( char **regions , int num_regions ) override;
+  void query_from_multi_region(char **regions, int num_regions) override;
+
+  ~BamHandle() {
+    hts_idx_.reset();
+    hts_itr_.reset();
+    hts_file_.reset();
+    if (header_) {
+      sam_hdr_destroy(header_);
+    }
+  }
 
 private:
   std::unique_ptr<htsFile, std::function<void(htsFile *)>> hts_file_;
