@@ -6,6 +6,6 @@ add_library(iostream ${ALL_SRC})
 
 target_link_libraries(iostream PRIVATE ${HTSLIB_LIBRARY})
 
-include_directories(${HTSLIB_INCLUDE_DIR})
+target_include_directories(iostream PRIVATE ${HTSLIB_INCLUDE_DIR})
 
 install(TARGETS iostream DESTINATION lib)

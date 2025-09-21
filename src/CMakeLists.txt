@@ -36,4 +36,4 @@ target_link_libraries(rodv_main
     iostream 
     ${HTSLIB_LIBRARY})
 
-include_directories(${HTSLIB_INCLUDE_DIR})
+target_include_directories(rodv_main PRIVATE ${HTSLIB_INCLUDE_DIR})
