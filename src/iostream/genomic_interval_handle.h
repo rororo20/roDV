@@ -34,7 +34,7 @@ public:
     hts_set_opt(get_htslib_handle(), HTS_OPT_THREAD_POOL, thread_pool);
   }
 
-  virtual void query_from_bedfile(const char *bedfile) {
+  virtual void query_from_multi_region(char **regions ,int num_regions) {
     query_type_ = QueryType::BEDFILE;
   };
 
