@@ -59,9 +59,9 @@ public:
     }
   }
 
-  virtual bool has_next() {}
+  virtual bool has_next() {return false;}
   virtual void close() {}
-  virtual bool next(Record *record) {}
+  virtual bool next(Record *record) {return false;}
 
   virtual ~GenomicIntervalHandle() {}
 
