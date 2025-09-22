@@ -4,6 +4,7 @@
 #include <htslib/hts.h>
 #include <htslib/tbx.h>
 #include <htslib/vcf.h>
+#include <memory>
 #include <string>
 
 class VcfHandle : public GenomicIntervalHandle<bcf1_t> {
