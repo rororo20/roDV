@@ -6,12 +6,22 @@
 #include <htslib/vcf.h>
 #include <memory>
 #include <string>
+#include <vector>
 
 class BedRecord {
 public:
   int tid;
   int64_t start;
   int64_t end;
+};
+
+class ChromInfo {
+public:
+  ChromInfo(std::string name, int32_t name_length, int32_t length)
+      : name(name), name_length(name_length), length(length) {}
+  std::string name;
+  int32_t name_length;
+  int32_t length;
 };
 
 class BedHandle : public GenomicIntervalHandle<BedRecord> {
@@ -40,6 +50,9 @@ public:
     if (!bam_header_ && !vcf_header_) {
       throw std::runtime_error("BAM or VCF header must be provided");
     }
+
+    // 初始化染色体信息
+    init_chrom_info();
   }
 
   htsFile *get_htslib_handle() override { return hts_file_.get(); }
@@ -71,4 +84,10 @@ private:
   sam_hdr_t *bam_header_;
   bcf_hdr_t *vcf_header_;
   int ret_code_;
+
+  // 染色体信息
+  std::vector<ChromInfo> chrom_info_;
+
+  // 私有方法
+  void init_chrom_info();
 };
