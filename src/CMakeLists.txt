@@ -27,6 +27,7 @@ else()
 endif()
 
 add_subdirectory(iostream)
+add_subdirectory(core)
 
 # 主程序可执行文件
 add_executable(rodv_main rodv_main.cpp)

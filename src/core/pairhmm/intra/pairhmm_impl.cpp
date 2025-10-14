@@ -1,0 +1,573 @@
+#include "pairhmm_impl.h"
+#include <cstring>
+#include <algorithm>
+
+namespace pairhmm {
+namespace intra {
+
+// ============================================================================
+// 模板实现：precompute_masks
+// ============================================================================
+template <typename Traits>
+void PairHMMComputer<Traits>::precompute_masks(
+    const TestCase& tc,
+    uint32_t cols,
+    uint32_t num_mask_vecs,
+    MaskType (*mask_arr)[k_num_distinct_chars])
+{
+    constexpr uint32_t mask_bit_cnt = main_type_size;
+    
+    // 初始化 mask 数组
+    for (uint32_t vi = 0; vi < num_mask_vecs; ++vi) {
+        for (uint32_t rs = 0; rs < k_num_distinct_chars; ++rs) {
+            mask_arr[vi][rs] = 0;
+        }
+        mask_arr[vi][k_ambig_char] = Traits::mask_all_ones;
+    }
+    
+    // 预计算每列的 mask
+    for (uint32_t col = 1; col < cols; ++col) {
+        uint32_t index = (col - 1) / mask_bit_cnt;
+        uint32_t offset = (col - 1) % mask_bit_cnt;
+        uint8_t hap_char = ConvertChar::get(tc.hap[col - 1]);
+        MaskType bit_mask = MaskType(1) << (mask_bit_cnt - 1 - offset);
+        mask_arr[index][hap_char] |= bit_mask;
+        
+        // 如果是模糊碱基 N，所有碱基都匹配
+        if (unlikely(hap_char == k_ambig_char)) {
+            for (uint32_t ci = 0; ci < k_num_distinct_chars; ++ci) {
+                mask_arr[index][ci] |= bit_mask;
+            }
+        }
+    }
+}
+
+// ============================================================================
+// 模板实现：initialize_vectors
+// ============================================================================
+template <typename Traits>
+void PairHMMComputer<Traits>::initialize_vectors(
+    uint32_t rows,
+    uint32_t cols,
+    MainType* shift_out_m,
+    MainType* shift_out_x,
+    MainType* shift_out_y,
+    Context<MainType>& ctx,
+    const TestCase& tc,
+    const ProbabilityArrays& pa,
+    SimdType* distm1d)
+{
+    const MainType zero = Context<MainType>::_(0.0);
+    const MainType init_y = Context<MainType>::INITIAL_CONSTANT / static_cast<MainType>(tc.haplen);
+    
+    // 初始化 shift 缓冲区
+    for (uint32_t s = 0; s < rows + cols + simd_width; s++) {
+        shift_out_m[s] = zero;
+        shift_out_x[s] = zero;
+        shift_out_y[s] = init_y;
+    }
+    
+    // 初始化概率数组（强制转换为 MainType*）
+    auto* ptr_p_mm = reinterpret_cast<MainType*>(pa.p_mm_arr);
+    auto* ptr_p_gapm = reinterpret_cast<MainType*>(pa.p_gapm_arr);
+    auto* ptr_p_mx = reinterpret_cast<MainType*>(pa.p_mx_arr);
+    auto* ptr_p_xx = reinterpret_cast<MainType*>(pa.p_xx_arr);
+    auto* ptr_p_my = reinterpret_cast<MainType*>(pa.p_my_arr);
+    auto* ptr_p_yy = reinterpret_cast<MainType*>(pa.p_yy_arr);
+    auto* ptr_distm1d = reinterpret_cast<MainType*>(distm1d);
+    
+    ptr_p_mm[0] = zero;
+    ptr_p_gapm[0] = zero;
+    ptr_p_mx[0] = zero;
+    ptr_p_xx[0] = zero;
+    ptr_p_my[0] = zero;
+    ptr_p_yy[0] = zero;
+    
+    // 填充质量分数转概率
+    for (uint32_t r = 1; r < rows; r++) {
+        const uint8_t _i = tc.i[r - 1] & 127;
+        const uint8_t _d = tc.d[r - 1] & 127;
+        const uint8_t _c = tc.c[r - 1] & 127;
+        const uint8_t _q = tc.q[r - 1] & 127;
+        
+        ptr_p_mm[r - 1] = ctx.set_mm_prob(_i, _d);
+        ptr_p_gapm[r - 1] = Context<MainType>::_(1.0) - Context<MainType>::ph2pr[_c];
+        ptr_p_mx[r - 1] = Context<MainType>::ph2pr[_i];
+        ptr_p_xx[r - 1] = Context<MainType>::ph2pr[_c];
+        ptr_p_my[r - 1] = Context<MainType>::ph2pr[_d];
+        ptr_p_yy[r - 1] = Context<MainType>::ph2pr[_c];
+        ptr_distm1d[r - 1] = Context<MainType>::ph2pr[_q];
+    }
+}
+
+// ============================================================================
+// 模板实现：stripe_initialization
+// ============================================================================
+template <typename Traits>
+void PairHMMComputer<Traits>::stripe_initialization(
+    uint32_t stripe_idx,
+    SimdType& p_gapm, SimdType& p_mm, SimdType& p_mx, SimdType& p_xx,
+    SimdType& p_my, SimdType& p_yy,
+    SimdType& distm, SimdType& _1_distm,
+    const SimdType* distm1d,
+    const SimdType* p_mm_arr,
+    const SimdType* p_gapm_arr,
+    const SimdType* p_mx_arr,
+    const SimdType* p_xx_arr,
+    const SimdType* p_my_arr,
+    const SimdType* p_yy_arr,
+    SimdType& m_t_1, SimdType& m_t_2,
+    SimdType& x_t_1, SimdType& x_t_2,
+    SimdType& y_t_1, SimdType& y_t_2,
+    SimdType& m_t_1_y,
+    const MainType* shift_out_x,
+    const MainType* shift_out_m,
+    const TestCase& tc)
+{
+    p_mm = p_mm_arr[stripe_idx];
+    p_gapm = p_gapm_arr[stripe_idx];
+    p_mx = p_mx_arr[stripe_idx];
+    p_xx = p_xx_arr[stripe_idx];
+    p_my = p_my_arr[stripe_idx];
+    p_yy = p_yy_arr[stripe_idx];
+    
+    const MainType zero = Context<MainType>::_(0.0);
+    const MainType init_y = Context<MainType>::INITIAL_CONSTANT / static_cast<MainType>(tc.haplen);
+    
+    if constexpr (std::is_same_v<MainType, float>) {
+        const SimdType packed1 = Traits::set1_ps(Context<MainType>::_(1.0));
+        const SimdType packed3 = Traits::set1_ps(Context<MainType>::_(3.0));
+        
+        distm = distm1d[stripe_idx];
+        _1_distm = Traits::sub_ps(packed1, distm);
+        distm = Traits::div_ps(distm, packed3);
+        
+        m_t_2 = Traits::setzero_ps();
+        x_t_2 = Traits::setzero_ps();
+        
+        if (stripe_idx == 0) {
+            m_t_1 = Traits::setzero_ps();
+            x_t_1 = Traits::setzero_ps();
+            y_t_2 = Traits::set_lse(init_y);
+            y_t_1 = Traits::setzero_ps();
+        } else {
+            x_t_1 = Traits::set_lse(shift_out_x[simd_width]);
+            m_t_1 = Traits::set_lse(shift_out_m[simd_width]);
+            y_t_2 = Traits::setzero_ps();
+            y_t_1 = Traits::setzero_ps();
+        }
+    } else {
+        const SimdType packed1 = Traits::set1_pd(Context<MainType>::_(1.0));
+        const SimdType packed3 = Traits::set1_pd(Context<MainType>::_(3.0));
+        
+        distm = distm1d[stripe_idx];
+        _1_distm = Traits::sub_pd(packed1, distm);
+        distm = Traits::div_pd(distm, packed3);
+        
+        m_t_2 = Traits::setzero_pd();
+        x_t_2 = Traits::setzero_pd();
+        
+        if (stripe_idx == 0) {
+            m_t_1 = Traits::setzero_pd();
+            x_t_1 = Traits::setzero_pd();
+            y_t_2 = Traits::set_lse(init_y);
+            y_t_1 = Traits::setzero_pd();
+        } else {
+            x_t_1 = Traits::set_lse(shift_out_x[simd_width]);
+            m_t_1 = Traits::set_lse(shift_out_m[simd_width]);
+            y_t_2 = Traits::setzero_pd();
+            y_t_1 = Traits::setzero_pd();
+        }
+    }
+    
+    m_t_1_y = m_t_1;
+}
+
+// ============================================================================
+// 模板实现：init_masks_for_row
+// ============================================================================
+template <typename Traits>
+void PairHMMComputer<Traits>::init_masks_for_row(
+    const TestCase& tc,
+    uint8_t* rs_arr,
+    typename Traits::VecIntType& last_mask_shift_out,
+    uint32_t begin_row_index,
+    uint32_t num_rows_to_process)
+{
+    const uint8_t* dest = tc.rs + begin_row_index - 1;
+    _mm_prefetch(dest, _MM_HINT_T0);
+    _mm_prefetch(rs_arr, _MM_HINT_T0);
+    _mm_prefetch(ConvertChar::k_conversion_table, _MM_HINT_T0);
+    
+    last_mask_shift_out = Traits::set1_epi32(0);
+    
+    if (likely(num_rows_to_process == simd_width)) {
+        // 展开循环以优化性能
+        for (uint32_t ri = 0; ri < simd_width; ++ri) {
+            rs_arr[ri] = ConvertChar::k_conversion_table[dest[ri] - 'A'];
+        }
+    } else {
+        for (uint32_t ri = 0; ri < num_rows_to_process; ++ri) {
+            rs_arr[ri] = ConvertChar::get(dest[ri]);
+        }
+    }
+}
+
+// ============================================================================
+// 模板实现：update_masks_for_cols
+// ============================================================================
+template <typename Traits>
+void PairHMMComputer<Traits>::update_masks_for_cols(
+    uint32_t mask_index,
+    typename Traits::VecIntType& bit_mask_vec,
+    MaskType (*mask_arr)[k_num_distinct_chars],
+    const uint8_t* rs_arr,
+    typename Traits::VecIntType& last_mask_shift_out)
+{
+    MaskType* arr = mask_arr[mask_index];
+    
+    // 构建 SIMD 向量
+    typename Traits::VecIntType src = Traits::set_epi32_from_array(arr, rs_arr);
+    typename Traits::VecIntType right_shift = Traits::get_right_shift_vector();
+    typename Traits::VecIntType mask_vec = Traits::srlv_epi32(src, right_shift);
+    bit_mask_vec = Traits::or_si256(mask_vec, last_mask_shift_out);
+    
+    // 计算保留的 mask
+    typename Traits::VecIntType reserved_mask = Traits::get_reserved_mask();
+    typename Traits::VecIntType reserved_src = Traits::and_si256(src, reserved_mask);
+    typename Traits::VecIntType left_shift = Traits::get_left_shift_vector();
+    last_mask_shift_out = Traits::sllv_epi32(reserved_src, left_shift);
+}
+
+// ============================================================================
+// 模板实现：compute_dist_vec
+// ============================================================================
+template <typename Traits>
+void PairHMMComputer<Traits>::compute_dist_vec(
+    typename Traits::VecIntType& bit_mask_vec,
+    SimdType& distm_chosen,
+    const SimdType& distm,
+    const SimdType& _1_distm)
+{
+    if constexpr (std::is_same_v<MainType, float>) {
+        distm_chosen = Traits::mask_blend_ps(
+            Traits::castsi256_ps(bit_mask_vec),
+            distm, _1_distm
+        );
+    } else {
+        distm_chosen = Traits::mask_blend_pd(
+            Traits::castsi256_pd(bit_mask_vec),
+            distm, _1_distm
+        );
+    }
+    bit_mask_vec = Traits::slli_epi32(bit_mask_vec, 1);
+}
+
+// ============================================================================
+// 模板实现：compute_mxy
+// ============================================================================
+template <typename Traits>
+void PairHMMComputer<Traits>::compute_mxy(
+    SimdType& m_t,
+    SimdType& m_t_y,
+    SimdType& x_t,
+    SimdType& y_t,
+    const SimdType& m_t_2,
+    const SimdType& x_t_2,
+    const SimdType& y_t_2,
+    const SimdType& m_t_1,
+    const SimdType& x_t_1,
+    const SimdType& m_t_1_y,
+    const SimdType& y_t_1,
+    const SimdType& p_mm,
+    const SimdType& p_gapm,
+    const SimdType& p_mx,
+    const SimdType& p_xx,
+    const SimdType& p_my,
+    const SimdType& p_yy,
+    const SimdType& distm_sel)
+{
+    // Match 状态: M[i][j] = distm * (p_mm*M[i-1][j-1] + p_gapm*I[i-1][j-1] + p_gapm*D[i-1][j-1])
+    if constexpr (std::is_same_v<MainType, float>) {
+        m_t = Traits::mul_ps(
+            Traits::add_ps(
+                Traits::add_ps(
+                    Traits::mul_ps(m_t_2, p_mm),
+                    Traits::mul_ps(x_t_2, p_gapm)
+                ),
+                Traits::mul_ps(y_t_2, p_gapm)
+            ),
+            distm_sel
+        );
+        
+        m_t_y = m_t;
+        
+        // Insertion 状态: I[i][j] = p_mx*M[i-1][j] + p_xx*I[i-1][j]
+        x_t = Traits::add_ps(
+            Traits::mul_ps(m_t_1, p_mx),
+            Traits::mul_ps(x_t_1, p_xx)
+        );
+        
+        // Deletion 状态: D[i][j] = p_my*M[i][j-1] + p_yy*D[i][j-1]
+        y_t = Traits::add_ps(
+            Traits::mul_ps(m_t_1_y, p_my),
+            Traits::mul_ps(y_t_1, p_yy)
+        );
+    } else {
+        // double 版本
+        m_t = Traits::mul_pd(
+            Traits::add_pd(
+                Traits::add_pd(
+                    Traits::mul_pd(m_t_2, p_mm),
+                    Traits::mul_pd(x_t_2, p_gapm)
+                ),
+                Traits::mul_pd(y_t_2, p_gapm)
+            ),
+            distm_sel
+        );
+        
+        m_t_y = m_t;
+        
+        x_t = Traits::add_pd(
+            Traits::mul_pd(m_t_1, p_mx),
+            Traits::mul_pd(x_t_1, p_xx)
+        );
+        
+        y_t = Traits::add_pd(
+            Traits::mul_pd(m_t_1_y, p_my),
+            Traits::mul_pd(y_t_1, p_yy)
+        );
+    }
+}
+
+// ============================================================================
+// 模板实现：vector_shift
+// ============================================================================
+template <typename Traits>
+void PairHMMComputer<Traits>::vector_shift(SimdType& x, MainType shift_in, MainType& shift_out)
+{
+    if constexpr (std::is_same_v<MainType, float>) {
+        if constexpr (Traits::simd_bits == 256) {
+            SimdType reversed_x = Traits::permutevar8x32_ps(x, Traits::get_reverse_permute());
+            shift_out = Traits::cvtss_f32(reversed_x);
+            x = Traits::template blend_ps<0b00000001>(reversed_x, Traits::set1_ps(shift_in));
+        } else {
+            SimdType reversed_x = Traits::permutevar16x32_ps(x, Traits::get_reverse_permute());
+            shift_out = Traits::cvtss_f32(reversed_x);
+            x = Traits::template blend_ps<0b00000001>(reversed_x, Traits::set1_ps(shift_in));
+        }
+    } else {
+        if constexpr (Traits::simd_bits == 256) {
+            SimdType reversed_x = Traits::template permute4x64_pd<0b10010011>(x);
+            shift_out = Traits::cvtsd_f64(reversed_x);
+            x = Traits::template blend_pd<0b0001>(reversed_x, Traits::set1_pd(shift_in));
+        } else {
+            SimdType reversed_x = Traits::permutevar8x64_pd(x, Traits::get_reverse_permute());
+            shift_out = Traits::cvtsd_f64(reversed_x);
+            x = Traits::template blend_pd<0b0001>(reversed_x, Traits::set1_pd(shift_in));
+        }
+    }
+}
+
+template <typename Traits>
+void PairHMMComputer<Traits>::vector_shift_last(SimdType& x, MainType shift_in)
+{
+    if constexpr (std::is_same_v<MainType, float>) {
+        if constexpr (Traits::simd_bits == 256) {
+            SimdType reversed_x = Traits::permutevar8x32_ps(x, Traits::get_reverse_permute());
+            x = Traits::template blend_ps<0b00000001>(reversed_x, Traits::set1_ps(shift_in));
+        } else {
+            SimdType reversed_x = Traits::permutevar16x32_ps(x, Traits::get_reverse_permute());
+            x = Traits::template blend_ps<0b00000001>(reversed_x, Traits::set1_ps(shift_in));
+        }
+    } else {
+        if constexpr (Traits::simd_bits == 256) {
+            SimdType reversed_x = Traits::template permute4x64_pd<0b10010011>(x);
+            x = Traits::template blend_pd<0b0001>(reversed_x, Traits::set1_pd(shift_in));
+        } else {
+            SimdType reversed_x = Traits::permutevar8x64_pd(x, Traits::get_reverse_permute());
+            x = Traits::template blend_pd<0b0001>(reversed_x, Traits::set1_pd(shift_in));
+        }
+    }
+}
+
+// ============================================================================
+// 模板实现：compute (主函数)
+// ============================================================================
+template <typename Traits>
+typename Traits::MainType PairHMMComputer<Traits>::compute(const TestCase& tc)
+{
+    // 初始化字符转换表
+    ConvertChar::init();
+    
+    uint32_t rows = tc.rslen + 1;
+    uint32_t cols = tc.haplen + 1;
+    uint32_t mavx_count = (rows + simd_width - 1) / simd_width;
+    
+    // 分配概率数组（栈上）
+    SimdType p_mm_arr[mavx_count], p_gapm_arr[mavx_count], p_mx_arr[mavx_count];
+    SimdType p_xx_arr[mavx_count], p_my_arr[mavx_count], p_yy_arr[mavx_count];
+    ProbabilityArrays pa{p_mm_arr, p_gapm_arr, p_mx_arr, p_xx_arr, p_my_arr, p_yy_arr};
+    
+    // 预计算 distm
+    SimdType distm1d_arr[mavx_count];
+    
+    // Shift 缓冲区
+    MainType shift_out_m[rows + cols + simd_width];
+    MainType shift_out_x[rows + cols + simd_width];
+    MainType shift_out_y[rows + cols + simd_width];
+    
+    // Context
+    Context<MainType> ctx;
+    const MainType zero = Context<MainType>::_(0.0);
+    
+    // 初始化向量
+    initialize_vectors(rows, cols, shift_out_m, shift_out_x, shift_out_y,
+                      ctx, tc, pa, distm1d_arr);
+    
+    // 预计算 masks
+    constexpr uint32_t mask_bit_cnt = main_type_size;
+    const uint32_t num_mask_vecs = (cols + rows + mask_bit_cnt - 1) / mask_bit_cnt;
+    MaskType mask_arr[num_mask_vecs][k_num_distinct_chars];
+    precompute_masks(tc, cols, num_mask_vecs, mask_arr);
+    
+    // HMM 状态向量
+    SimdType m_t, m_t_1, m_t_2, x_t, x_t_1, x_t_2, y_t, y_t_1, y_t_2, m_t_y, m_t_1_y;
+    SimdType p_gapm, p_mm, p_mx, p_xx, p_my, p_yy;
+    SimdType distm, _1_distm, distm_chosen;
+    
+    uint32_t remaining_rows = (rows - 1) % simd_width;
+    uint32_t stripe_cnt = ((rows - 1) / simd_width) + (remaining_rows != 0);
+    
+    uint8_t rs_arr[simd_width];
+    typename Traits::VecIntType bit_mask_vec;
+    typename Traits::VecIntType last_mask_shift_out;
+    uint32_t shift_idx;
+    uint32_t num_mask_bits_to_process;
+    
+    // 处理完整的 stripes
+    for (uint32_t i = 0; i < stripe_cnt - 1; ++i) {
+        _mm_prefetch(tc.rs + i * simd_width, _MM_HINT_T0);
+        
+        stripe_initialization(i, p_gapm, p_mm, p_mx, p_xx, p_my, p_yy, distm, _1_distm,
+                            distm1d_arr, p_mm_arr, p_gapm_arr, p_mx_arr, p_xx_arr, p_my_arr, p_yy_arr,
+                            m_t_1, m_t_2, x_t_1, x_t_2, y_t_1, y_t_2, m_t_1_y,
+                            shift_out_x, shift_out_m, tc);
+        
+        init_masks_for_row(tc, rs_arr, last_mask_shift_out, i * simd_width + 1, simd_width);
+        
+        for (uint32_t begin_d = 1; begin_d < cols + simd_width; begin_d += main_type_size) {
+            num_mask_bits_to_process = std::min(main_type_size, cols + simd_width - begin_d);
+            
+            update_masks_for_cols((begin_d - 1) / main_type_size, bit_mask_vec, mask_arr, rs_arr, last_mask_shift_out);
+            
+            for (uint32_t mbi = 0; mbi < num_mask_bits_to_process; ++mbi) {
+                shift_idx = begin_d + mbi + simd_width;
+                
+                compute_dist_vec(bit_mask_vec, distm_chosen, distm, _1_distm);
+                
+                compute_mxy(m_t, m_t_y, x_t, y_t, m_t_2, x_t_2, y_t_2, m_t_1, x_t_1, m_t_1_y, y_t_1,
+                           p_mm, p_gapm, p_mx, p_xx, p_my, p_yy, distm_chosen);
+                
+                vector_shift(m_t, shift_out_m[shift_idx], shift_out_m[begin_d + mbi]);
+                vector_shift(x_t, shift_out_x[shift_idx], shift_out_x[begin_d + mbi]);
+                vector_shift(y_t_1, shift_out_y[shift_idx], shift_out_y[begin_d + mbi]);
+                
+                m_t_2 = m_t_1;
+                m_t_1 = m_t;
+                x_t_2 = x_t_1;
+                x_t_1 = x_t;
+                y_t_2 = y_t_1;
+                y_t_1 = y_t;
+                m_t_1_y = m_t_y;
+            }
+        }
+    }
+    
+    // 处理最后一个 stripe
+    {
+        uint32_t i = stripe_cnt - 1;
+        
+        stripe_initialization(i, p_gapm, p_mm, p_mx, p_xx, p_my, p_yy, distm, _1_distm,
+                            distm1d_arr, p_mm_arr, p_gapm_arr, p_mx_arr, p_xx_arr, p_my_arr, p_yy_arr,
+                            m_t_1, m_t_2, x_t_1, x_t_2, y_t_1, y_t_2, m_t_1_y,
+                            shift_out_x, shift_out_m, tc);
+        
+        if (remaining_rows == 0) {
+            remaining_rows = simd_width;
+        }
+        init_masks_for_row(tc, rs_arr, last_mask_shift_out, i * simd_width + 1, remaining_rows);
+        
+        SimdType sum_m, sum_x;
+        if constexpr (std::is_same_v<MainType, float>) {
+            sum_m = Traits::setzero_ps();
+            sum_x = Traits::setzero_ps();
+        } else {
+            sum_m = Traits::setzero_pd();
+            sum_x = Traits::setzero_pd();
+        }
+        
+        for (uint32_t begin_d = 1; begin_d < cols + remaining_rows - 1; begin_d += main_type_size) {
+            num_mask_bits_to_process = std::min(main_type_size, cols + remaining_rows - 1 - begin_d);
+            
+            update_masks_for_cols((begin_d - 1) / main_type_size, bit_mask_vec, mask_arr, rs_arr, last_mask_shift_out);
+            
+            for (uint32_t mbi = 0; mbi < num_mask_bits_to_process; ++mbi) {
+                shift_idx = begin_d + mbi + simd_width;
+                
+                compute_dist_vec(bit_mask_vec, distm_chosen, distm, _1_distm);
+                
+                compute_mxy(m_t, m_t_y, x_t, y_t, m_t_2, x_t_2, y_t_2, m_t_1, x_t_1, m_t_1_y, y_t_1,
+                           p_mm, p_gapm, p_mx, p_xx, p_my, p_yy, distm_chosen);
+                
+                if constexpr (std::is_same_v<MainType, float>) {
+                    sum_m = Traits::add_ps(sum_m, m_t);
+                    sum_x = Traits::add_ps(sum_x, x_t);
+                } else {
+                    sum_m = Traits::add_pd(sum_m, m_t);
+                    sum_x = Traits::add_pd(sum_x, x_t);
+                }
+                vector_shift_last(m_t, shift_out_m[shift_idx]);
+                vector_shift_last(x_t, shift_out_x[shift_idx]);
+                
+                vector_shift_last(y_t_1, shift_out_y[shift_idx]);
+                
+                m_t_2 = m_t_1;
+                m_t_1 = m_t;
+                x_t_2 = x_t_1;
+                x_t_1 = x_t;
+                y_t_2 = y_t_1;
+                y_t_1 = y_t;
+                m_t_1_y = m_t_y;
+            }
+        }
+        
+        // 提取结果
+        alignas(64) MainType m_result[simd_width];
+        alignas(64) MainType x_result[simd_width];
+        if constexpr (std::is_same_v<MainType, float>) {
+            Traits::store_ps(m_result, sum_m);
+            Traits::store_ps(x_result, sum_x);
+        } else {
+            Traits::store_pd(m_result, sum_m);
+            Traits::store_pd(x_result, sum_x);
+        }
+        return m_result[remaining_rows - 1] + x_result[remaining_rows - 1];
+    }
+}
+
+// ============================================================================
+// 显式实例化（编译器会生成具体代码）
+// ============================================================================
+// 始终实例化 AVX2 版本
+template class PairHMMComputer<AVX2FloatTraits>;
+template class PairHMMComputer<AVX2DoubleTraits>;
+
+// 仅在支持 AVX512 时实例化 AVX512 版本
+#ifdef __AVX512F__
+template class PairHMMComputer<AVX512FloatTraits>;
+template class PairHMMComputer<AVX512DoubleTraits>;
+#endif
+
+}  // namespace intra
+}  // namespace pairhmm
