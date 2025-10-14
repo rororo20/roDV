@@ -140,11 +140,6 @@ private:
         const SimdType& distm,
         const SimdType& _1_distm);
     
-    // 向量移位
-    static void vector_shift(SimdType& x, MainType shift_in, MainType& shift_out);
-    
-    // 向量移位（最后一行）
-    static void vector_shift_last(SimdType& x, MainType shift_in);
 };
 
 }  // namespace intra

@@ -131,53 +131,28 @@ void PairHMMComputer<Traits>::stripe_initialization(
     p_my = p_my_arr[stripe_idx];
     p_yy = p_yy_arr[stripe_idx];
     
-    const MainType zero = Context<MainType>::_(0.0);
     const MainType init_y = Context<MainType>::INITIAL_CONSTANT / static_cast<MainType>(tc.haplen);
     
-    if constexpr (std::is_same_v<MainType, float>) {
-        const SimdType packed1 = Traits::set1_ps(Context<MainType>::_(1.0));
-        const SimdType packed3 = Traits::set1_ps(Context<MainType>::_(3.0));
-        
-        distm = distm1d[stripe_idx];
-        _1_distm = Traits::sub_ps(packed1, distm);
-        distm = Traits::div_ps(distm, packed3);
-        
-        m_t_2 = Traits::setzero_ps();
-        x_t_2 = Traits::setzero_ps();
-        
-        if (stripe_idx == 0) {
-            m_t_1 = Traits::setzero_ps();
-            x_t_1 = Traits::setzero_ps();
-            y_t_2 = Traits::set_lse(init_y);
-            y_t_1 = Traits::setzero_ps();
-        } else {
-            x_t_1 = Traits::set_lse(shift_out_x[simd_width]);
-            m_t_1 = Traits::set_lse(shift_out_m[simd_width]);
-            y_t_2 = Traits::setzero_ps();
-            y_t_1 = Traits::setzero_ps();
-        }
+    const SimdType packed1 = Traits::set1(Context<MainType>::_(1.0));
+    const SimdType packed3 = Traits::set1(Context<MainType>::_(3.0));
+    
+    distm = distm1d[stripe_idx];
+    _1_distm = Traits::sub(packed1, distm);
+    distm = Traits::div(distm, packed3);
+    
+    m_t_2 = Traits::setzero();
+    x_t_2 = Traits::setzero();
+    
+    if (stripe_idx == 0) {
+        m_t_1 = Traits::setzero();
+        x_t_1 = Traits::setzero();
+        y_t_2 = Traits::set_lse(init_y);
+        y_t_1 = Traits::setzero();
     } else {
-        const SimdType packed1 = Traits::set1_pd(Context<MainType>::_(1.0));
-        const SimdType packed3 = Traits::set1_pd(Context<MainType>::_(3.0));
-        
-        distm = distm1d[stripe_idx];
-        _1_distm = Traits::sub_pd(packed1, distm);
-        distm = Traits::div_pd(distm, packed3);
-        
-        m_t_2 = Traits::setzero_pd();
-        x_t_2 = Traits::setzero_pd();
-        
-        if (stripe_idx == 0) {
-            m_t_1 = Traits::setzero_pd();
-            x_t_1 = Traits::setzero_pd();
-            y_t_2 = Traits::set_lse(init_y);
-            y_t_1 = Traits::setzero_pd();
-        } else {
-            x_t_1 = Traits::set_lse(shift_out_x[simd_width]);
-            m_t_1 = Traits::set_lse(shift_out_m[simd_width]);
-            y_t_2 = Traits::setzero_pd();
-            y_t_1 = Traits::setzero_pd();
-        }
+        x_t_1 = Traits::set_lse(shift_out_x[simd_width]);
+        m_t_1 = Traits::set_lse(shift_out_m[simd_width]);
+        y_t_2 = Traits::setzero();
+        y_t_1 = Traits::setzero();
     }
     
     m_t_1_y = m_t_1;
@@ -212,7 +187,7 @@ void PairHMMComputer<Traits>::init_masks_for_row(
         }
     }
 }
-
+// FixMe: 这个函数需要修改
 // ============================================================================
 // 模板实现：update_masks_for_cols
 // ============================================================================
@@ -249,17 +224,10 @@ void PairHMMComputer<Traits>::compute_dist_vec(
     const SimdType& distm,
     const SimdType& _1_distm)
 {
-    if constexpr (std::is_same_v<MainType, float>) {
-        distm_chosen = Traits::mask_blend_ps(
-            Traits::castsi256_ps(bit_mask_vec),
-            distm, _1_distm
-        );
-    } else {
-        distm_chosen = Traits::mask_blend_pd(
-            Traits::castsi256_pd(bit_mask_vec),
-            distm, _1_distm
-        );
-    }
+    distm_chosen = Traits::mask_blend(
+        Traits::castsi256(bit_mask_vec),
+        distm, _1_distm
+    );
     bit_mask_vec = Traits::slli_epi32(bit_mask_vec, 1);
 }
 
@@ -288,107 +256,30 @@ void PairHMMComputer<Traits>::compute_mxy(
     const SimdType& distm_sel)
 {
     // Match 状态: M[i][j] = distm * (p_mm*M[i-1][j-1] + p_gapm*I[i-1][j-1] + p_gapm*D[i-1][j-1])
-    if constexpr (std::is_same_v<MainType, float>) {
-        m_t = Traits::mul_ps(
-            Traits::add_ps(
-                Traits::add_ps(
-                    Traits::mul_ps(m_t_2, p_mm),
-                    Traits::mul_ps(x_t_2, p_gapm)
-                ),
-                Traits::mul_ps(y_t_2, p_gapm)
+    m_t = Traits::mul(
+        Traits::add(
+            Traits::add(
+                Traits::mul(m_t_2, p_mm),
+                Traits::mul(x_t_2, p_gapm)
             ),
-            distm_sel
-        );
-        
-        m_t_y = m_t;
-        
-        // Insertion 状态: I[i][j] = p_mx*M[i-1][j] + p_xx*I[i-1][j]
-        x_t = Traits::add_ps(
-            Traits::mul_ps(m_t_1, p_mx),
-            Traits::mul_ps(x_t_1, p_xx)
-        );
-        
-        // Deletion 状态: D[i][j] = p_my*M[i][j-1] + p_yy*D[i][j-1]
-        y_t = Traits::add_ps(
-            Traits::mul_ps(m_t_1_y, p_my),
-            Traits::mul_ps(y_t_1, p_yy)
-        );
-    } else {
-        // double 版本
-        m_t = Traits::mul_pd(
-            Traits::add_pd(
-                Traits::add_pd(
-                    Traits::mul_pd(m_t_2, p_mm),
-                    Traits::mul_pd(x_t_2, p_gapm)
-                ),
-                Traits::mul_pd(y_t_2, p_gapm)
-            ),
-            distm_sel
-        );
-        
-        m_t_y = m_t;
-        
-        x_t = Traits::add_pd(
-            Traits::mul_pd(m_t_1, p_mx),
-            Traits::mul_pd(x_t_1, p_xx)
-        );
-        
-        y_t = Traits::add_pd(
-            Traits::mul_pd(m_t_1_y, p_my),
-            Traits::mul_pd(y_t_1, p_yy)
-        );
-    }
-}
-
-// ============================================================================
-// 模板实现：vector_shift
-// ============================================================================
-template <typename Traits>
-void PairHMMComputer<Traits>::vector_shift(SimdType& x, MainType shift_in, MainType& shift_out)
-{
-    if constexpr (std::is_same_v<MainType, float>) {
-        if constexpr (Traits::simd_bits == 256) {
-            SimdType reversed_x = Traits::permutevar8x32_ps(x, Traits::get_reverse_permute());
-            shift_out = Traits::cvtss_f32(reversed_x);
-            x = Traits::template blend_ps<0b00000001>(reversed_x, Traits::set1_ps(shift_in));
-        } else {
-            SimdType reversed_x = Traits::permutevar16x32_ps(x, Traits::get_reverse_permute());
-            shift_out = Traits::cvtss_f32(reversed_x);
-            x = Traits::template blend_ps<0b00000001>(reversed_x, Traits::set1_ps(shift_in));
-        }
-    } else {
-        if constexpr (Traits::simd_bits == 256) {
-            SimdType reversed_x = Traits::template permute4x64_pd<0b10010011>(x);
-            shift_out = Traits::cvtsd_f64(reversed_x);
-            x = Traits::template blend_pd<0b0001>(reversed_x, Traits::set1_pd(shift_in));
-        } else {
-            SimdType reversed_x = Traits::permutevar8x64_pd(x, Traits::get_reverse_permute());
-            shift_out = Traits::cvtsd_f64(reversed_x);
-            x = Traits::template blend_pd<0b0001>(reversed_x, Traits::set1_pd(shift_in));
-        }
-    }
-}
-
-template <typename Traits>
-void PairHMMComputer<Traits>::vector_shift_last(SimdType& x, MainType shift_in)
-{
-    if constexpr (std::is_same_v<MainType, float>) {
-        if constexpr (Traits::simd_bits == 256) {
-            SimdType reversed_x = Traits::permutevar8x32_ps(x, Traits::get_reverse_permute());
-            x = Traits::template blend_ps<0b00000001>(reversed_x, Traits::set1_ps(shift_in));
-        } else {
-            SimdType reversed_x = Traits::permutevar16x32_ps(x, Traits::get_reverse_permute());
-            x = Traits::template blend_ps<0b00000001>(reversed_x, Traits::set1_ps(shift_in));
-        }
-    } else {
-        if constexpr (Traits::simd_bits == 256) {
-            SimdType reversed_x = Traits::template permute4x64_pd<0b10010011>(x);
-            x = Traits::template blend_pd<0b0001>(reversed_x, Traits::set1_pd(shift_in));
-        } else {
-            SimdType reversed_x = Traits::permutevar8x64_pd(x, Traits::get_reverse_permute());
-            x = Traits::template blend_pd<0b0001>(reversed_x, Traits::set1_pd(shift_in));
-        }
-    }
+            Traits::mul(y_t_2, p_gapm)
+        ),
+        distm_sel
+    );
+    
+    m_t_y = m_t;
+    
+    // Insertion 状态: I[i][j] = p_mx*M[i-1][j] + p_xx*I[i-1][j]
+    x_t = Traits::add(
+        Traits::mul(m_t_1, p_mx),
+        Traits::mul(x_t_1, p_xx)
+    );
+    
+    // Deletion 状态: D[i][j] = p_my*M[i][j-1] + p_yy*D[i][j-1]
+    y_t = Traits::add(
+        Traits::mul(m_t_1_y, p_my),
+        Traits::mul(y_t_1, p_yy)
+    );
 }
 
 // ============================================================================
@@ -419,7 +310,6 @@ typename Traits::MainType PairHMMComputer<Traits>::compute(const TestCase& tc)
     
     // Context
     Context<MainType> ctx;
-    const MainType zero = Context<MainType>::_(0.0);
     
     // 初始化向量
     initialize_vectors(rows, cols, shift_out_m, shift_out_x, shift_out_y,
@@ -469,9 +359,9 @@ typename Traits::MainType PairHMMComputer<Traits>::compute(const TestCase& tc)
                 compute_mxy(m_t, m_t_y, x_t, y_t, m_t_2, x_t_2, y_t_2, m_t_1, x_t_1, m_t_1_y, y_t_1,
                            p_mm, p_gapm, p_mx, p_xx, p_my, p_yy, distm_chosen);
                 
-                vector_shift(m_t, shift_out_m[shift_idx], shift_out_m[begin_d + mbi]);
-                vector_shift(x_t, shift_out_x[shift_idx], shift_out_x[begin_d + mbi]);
-                vector_shift(y_t_1, shift_out_y[shift_idx], shift_out_y[begin_d + mbi]);
+                Traits::vector_shift(m_t, shift_out_m[shift_idx], shift_out_m[begin_d + mbi]);
+                Traits::vector_shift(x_t, shift_out_x[shift_idx], shift_out_x[begin_d + mbi]);
+                Traits::vector_shift(y_t_1, shift_out_y[shift_idx], shift_out_y[begin_d + mbi]);
                 
                 m_t_2 = m_t_1;
                 m_t_1 = m_t;
@@ -498,14 +388,8 @@ typename Traits::MainType PairHMMComputer<Traits>::compute(const TestCase& tc)
         }
         init_masks_for_row(tc, rs_arr, last_mask_shift_out, i * simd_width + 1, remaining_rows);
         
-        SimdType sum_m, sum_x;
-        if constexpr (std::is_same_v<MainType, float>) {
-            sum_m = Traits::setzero_ps();
-            sum_x = Traits::setzero_ps();
-        } else {
-            sum_m = Traits::setzero_pd();
-            sum_x = Traits::setzero_pd();
-        }
+        SimdType sum_m = Traits::setzero();
+        SimdType sum_x = Traits::setzero();
         
         for (uint32_t begin_d = 1; begin_d < cols + remaining_rows - 1; begin_d += main_type_size) {
             num_mask_bits_to_process = std::min(main_type_size, cols + remaining_rows - 1 - begin_d);
@@ -520,17 +404,12 @@ typename Traits::MainType PairHMMComputer<Traits>::compute(const TestCase& tc)
                 compute_mxy(m_t, m_t_y, x_t, y_t, m_t_2, x_t_2, y_t_2, m_t_1, x_t_1, m_t_1_y, y_t_1,
                            p_mm, p_gapm, p_mx, p_xx, p_my, p_yy, distm_chosen);
                 
-                if constexpr (std::is_same_v<MainType, float>) {
-                    sum_m = Traits::add_ps(sum_m, m_t);
-                    sum_x = Traits::add_ps(sum_x, x_t);
-                } else {
-                    sum_m = Traits::add_pd(sum_m, m_t);
-                    sum_x = Traits::add_pd(sum_x, x_t);
-                }
-                vector_shift_last(m_t, shift_out_m[shift_idx]);
-                vector_shift_last(x_t, shift_out_x[shift_idx]);
+                sum_m = Traits::add(sum_m, m_t);
+                sum_x = Traits::add(sum_x, x_t);
+                Traits::vector_shift_last(m_t, shift_out_m[shift_idx]);
+                Traits::vector_shift_last(x_t, shift_out_x[shift_idx]);
                 
-                vector_shift_last(y_t_1, shift_out_y[shift_idx]);
+                Traits::vector_shift_last(y_t_1, shift_out_y[shift_idx]);
                 
                 m_t_2 = m_t_1;
                 m_t_1 = m_t;
@@ -545,13 +424,8 @@ typename Traits::MainType PairHMMComputer<Traits>::compute(const TestCase& tc)
         // 提取结果
         alignas(64) MainType m_result[simd_width];
         alignas(64) MainType x_result[simd_width];
-        if constexpr (std::is_same_v<MainType, float>) {
-            Traits::store_ps(m_result, sum_m);
-            Traits::store_ps(x_result, sum_x);
-        } else {
-            Traits::store_pd(m_result, sum_m);
-            Traits::store_pd(x_result, sum_x);
-        }
+        Traits::store(m_result, sum_m);
+        Traits::store(x_result, sum_x);
         return m_result[remaining_rows - 1] + x_result[remaining_rows - 1];
     }
 }
