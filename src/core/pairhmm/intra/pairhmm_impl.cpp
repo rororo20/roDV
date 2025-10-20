@@ -202,7 +202,7 @@ void PairHMMComputer<Traits>::update_masks_for_cols(
     MaskType* arr = mask_arr[mask_index];
     
     // 构建 SIMD 向量
-    typename Traits::VecIntType src = Traits::set_epi32_from_array(arr, rs_arr);
+    typename Traits::VecIntType src = Traits::set_epi_from_array(arr, rs_arr);
     typename Traits::VecIntType right_shift = Traits::get_right_shift_vector();
     typename Traits::VecIntType mask_vec = Traits::srlv_epi32(src, right_shift);
     bit_mask_vec = Traits::or_si256(mask_vec, last_mask_shift_out);

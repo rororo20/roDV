@@ -93,10 +93,12 @@ struct AVX2FloatTraits {
         return _mm256_castsi256_ps(v);
     }
     
-    static inline SimdIntType set_epi32_from_array(const MaskType* arr, const uint8_t* rs_arr) {
+    static inline SimdIntType set_epi_from_array(const MaskType* arr, const uint8_t* rs_arr) {
         return _mm256_set_epi32(
-            arr[rs_arr[7]], arr[rs_arr[6]], arr[rs_arr[5]], arr[rs_arr[4]],
-            arr[rs_arr[3]], arr[rs_arr[2]], arr[rs_arr[1]], arr[rs_arr[0]]
+            static_cast<int32_t>(arr[rs_arr[7]]), static_cast<int32_t>(arr[rs_arr[6]]), 
+            static_cast<int32_t>(arr[rs_arr[5]]), static_cast<int32_t>(arr[rs_arr[4]]),
+            static_cast<int32_t>(arr[rs_arr[3]]), static_cast<int32_t>(arr[rs_arr[2]]),
+            static_cast<int32_t>( arr[rs_arr[1]]), static_cast<int32_t>(arr[rs_arr[0]])
         );
     }
     
@@ -192,12 +194,10 @@ struct AVX2DoubleTraits {
     }
     
     // 整数向量操作
-    static inline SimdIntType set_epi32_from_array(const MaskType* arr, const uint8_t* rs_arr) {
-        return _mm256_set_epi32(
-            static_cast<int32_t>(arr[7]), static_cast<int32_t>(arr[6]), 
-            static_cast<int32_t>(arr[5]), static_cast<int32_t>(arr[4]), 
-            static_cast<int32_t>(arr[3]), static_cast<int32_t>(arr[2]), 
-            static_cast<int32_t>(arr[1]), static_cast<int32_t>(arr[0])
+    static inline SimdIntType set_epi_from_array(const MaskType* arr, const uint8_t* rs_arr) {
+        return _mm256_set_epi64x(
+            static_cast<int64_t>(arr[rs_arr[3]]),static_cast<int64_t>(arr[rs_arr[2]]),
+            static_cast<int64_t>(arr[rs_arr[1]]),static_cast<int64_t>(arr[rs_arr[0]])
         );
     }
     
@@ -257,11 +257,6 @@ struct AVX2DoubleTraits {
         return _mm256_set_pd(0, 0, 0, v);
     }
     
-    static inline SimdIntType set_epi64_from_array(const MaskType* arr, const uint8_t* rs_arr) {
-        return _mm256_set_epi64x(
-            arr[rs_arr[3]], arr[rs_arr[2]], arr[rs_arr[1]], arr[rs_arr[0]]
-        );
-    }
     
     static inline SimdIntType get_right_shift_vector() {
         return _mm256_set_epi64x(3, 2, 1, 0);
@@ -374,7 +369,7 @@ struct AVX512FloatTraits {
         return _mm512_mask_blend_ps(mask_val, a, b);
     }
     
-    static inline SimdIntType set_epi32_from_array(const MaskType* arr, const uint8_t* rs_arr) {
+    static inline SimdIntType set_epi_from_array(const MaskType* arr, const uint8_t* rs_arr) {
         return _mm512_set_epi32(
             arr[rs_arr[15]], arr[rs_arr[14]], arr[rs_arr[13]], arr[rs_arr[12]],
             arr[rs_arr[11]], arr[rs_arr[10]], arr[rs_arr[9]], arr[rs_arr[8]],
@@ -534,13 +529,6 @@ struct AVX512DoubleTraits {
         return _mm512_mask_blend_pd(mask_val, a, b);
     }
     
-    static inline SimdIntType set_epi64_from_array(const MaskType* arr, const uint8_t* rs_arr) {
-        return _mm512_set_epi64(
-            arr[rs_arr[7]], arr[rs_arr[6]], arr[rs_arr[5]], arr[rs_arr[4]],
-            arr[rs_arr[3]], arr[rs_arr[2]], arr[rs_arr[1]], arr[rs_arr[0]]
-        );
-    }
-    
     static inline SimdIntType get_right_shift_vector() {
         return _mm512_set_epi64(7, 6, 5, 4, 3, 2, 1, 0);
     }
@@ -586,16 +574,12 @@ struct AVX512DoubleTraits {
     }
     
     // 整数向量操作
-    static inline SimdIntType set_epi32_from_array(const MaskType* arr, const uint8_t* rs_arr) {
-        return _mm512_set_epi32(
-            static_cast<int32_t>(arr[15]), static_cast<int32_t>(arr[14]), 
-            static_cast<int32_t>(arr[13]), static_cast<int32_t>(arr[12]), 
-            static_cast<int32_t>(arr[11]), static_cast<int32_t>(arr[10]), 
-            static_cast<int32_t>(arr[9]), static_cast<int32_t>(arr[8]),
-            static_cast<int32_t>(arr[7]), static_cast<int32_t>(arr[6]), 
-            static_cast<int32_t>(arr[5]), static_cast<int32_t>(arr[4]), 
-            static_cast<int32_t>(arr[3]), static_cast<int32_t>(arr[2]), 
-            static_cast<int32_t>(arr[1]), static_cast<int32_t>(arr[0])
+    static inline SimdIntType set_epi_from_array(const MaskType* arr, const uint8_t* rs_arr) {
+        return _mm512_set_epi64(
+            static_cast<int64_t>(arr[rs_arr[7]]), static_cast<int64_t>(arr[rs_arr[6]]), 
+            static_cast<int64_t>(arr[rs_arr[5]]), static_cast<int64_t>(arr[rs_arr[4]]), 
+            static_cast<int64_t>(arr[rs_arr[3]]), static_cast<int64_t>(arr[rs_arr[2]]), 
+            static_cast<int64_t>(arr[rs_arr[1]]), static_cast<int64_t>(arr[rs_arr[0]])
         );
     }
     
