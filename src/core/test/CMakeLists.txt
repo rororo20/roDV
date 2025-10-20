@@ -19,29 +19,46 @@ set(AVX512_FLAGS "-mavx512f;-mavx512dq;-mavx512bw;-mavx512vl;-mavx2;-mfma")
 # 头文件路径
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
+# GoogleTest 配置
+find_package(GTest REQUIRED)
+
 # ============================================================================
-# 根据编译的库决定测试目标
+# GoogleTest 单元测试
 # ============================================================================
 
-# AVX2 测试（始终编译，如果 AVX2 库存在）
+# GoogleTest 单元测试（AVX2 + AVX512）
 if(TARGET pairhmm_intra_avx2)
-    message(STATUS "Building AVX2 test")
-    add_executable(pairhmm_test_avx2 pairhmm_test_avx2.cpp)
-    target_link_libraries(pairhmm_test_avx2 pairhmm_intra_avx2)
-    target_compile_options(pairhmm_test_avx2 PRIVATE ${AVX2_FLAGS_ONLY})
+    message(STATUS "Building GoogleTest unit tests")
     
-    enable_testing()
-    add_test(NAME PairHMMUnitTestAVX2 COMMAND pairhmm_test_avx2)
+    # 完整的GoogleTest测试（如果AVX512可用）
+    if(TARGET pairhmm_intra_avx512)
+        add_executable(pairhmm_unittest pairhmm_unittest.cpp)
+        target_link_libraries(pairhmm_unittest 
+            GTest::gtest 
+            GTest::gtest_main
+            pairhmm_intra_avx2 
+            pairhmm_intra_avx512
+        )
+        target_compile_options(pairhmm_unittest PRIVATE ${AVX512_FLAGS})
+        
+        enable_testing()
+        add_test(NAME PairHMMGoogleTestFull COMMAND pairhmm_unittest)
+        message(STATUS "Added GoogleTest (AVX2 + AVX512)")
+    else()
+        # 仅AVX2的GoogleTest测试
+        add_executable(pairhmm_unittest_avx2 pairhmm_unittest.cpp)
+        target_link_libraries(pairhmm_unittest_avx2 
+            GTest::gtest 
+            GTest::gtest_main
+            pairhmm_intra_avx2
+        )
+        target_compile_options(pairhmm_unittest_avx2 PRIVATE ${AVX2_FLAGS_ONLY})
+        
+        enable_testing()
+        add_test(NAME PairHMMGoogleTestAVX2 COMMAND pairhmm_unittest_avx2)
+        message(STATUS "Added GoogleTest (AVX2 only)")
+    endif()
+else()
+    message(WARNING "pairhmm_intra_avx2 target not found, skipping GoogleTest")
 endif()
 
-# 完整测试（仅在 AVX512 可用时编译）
-if(TARGET pairhmm_intra_avx512)
-    message(STATUS "Building full test (AVX2 + AVX512)")
-    add_executable(pairhmm_test pairhmm_test.cpp)
-    target_link_libraries(pairhmm_test pairhmm_intra_avx2 pairhmm_intra_avx512)
-    target_compile_options(pairhmm_test PRIVATE ${AVX512_FLAGS})
-    
-    add_test(NAME PairHMMUnitTestFull COMMAND pairhmm_test)
-else()
-    message(STATUS "AVX512 not available, skipping full test")
-endif()
