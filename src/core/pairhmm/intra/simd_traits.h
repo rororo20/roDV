@@ -41,10 +41,6 @@ struct AVX2FloatTraits {
     static inline SimdIntType set1_epi32(int32_t v) { return _mm256_set1_epi32(v); }
     static inline SimdIntType setzero_si256() { return _mm256_setzero_si256(); }
     
-    // 特殊操作：设置最低元素
-    static inline SimdType set_lse(MainType v, MainType zero) {
-        return _mm256_set_ps(zero, zero, zero, zero, zero, zero, zero, v);
-    }
     
     // Blend 操作（条件选择）
     static inline SimdType blendv_ps(SimdType a, SimdType b, SimdType mask) {
@@ -181,10 +177,6 @@ struct AVX2DoubleTraits {
     static inline SimdIntType set1_epi32(int32_t v) { return _mm256_set1_epi32(v); }
     static inline SimdIntType setzero_si256() { return _mm256_setzero_si256(); }
     
-    static inline SimdType set_lse(MainType v, MainType zero) {
-        return _mm256_set_pd(zero, zero, zero, v);
-    }
-    
     static inline SimdType blendv_pd(SimdType a, SimdType b, SimdType mask) {
         return _mm256_blendv_pd(a, b, mask);
     }
@@ -263,11 +255,11 @@ struct AVX2DoubleTraits {
     }
     
     static inline SimdIntType get_reserved_mask() {
-        return _mm256_set_epi64x(0x1F, 0x0F, 0x07, 0x03);
+        return _mm256_set_epi64x(0b111, 0b11, 0b10, 0b0);
     }
     
     static inline SimdIntType get_left_shift_vector() {
-        return _mm256_set_epi64x(61, 62, 63, 64);
+        return _mm256_set_epi64x(29, 30, 31, 32);
     }
     
     static inline SimdIntType srlv_epi64(SimdIntType a, SimdIntType b) {
