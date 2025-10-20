@@ -330,6 +330,7 @@ protected:
 
   /**
    * @brief 检查结果精度是否在合理范围内
+   * 新API统一返回double，但内部可能使用float或double计算
    */
   template <typename T>
   void checkResultAccuracy(T actual, double expected,
@@ -337,11 +338,11 @@ protected:
     double actual_d = static_cast<double>(actual);
     double rel_error = std::abs(actual_d - expected) / std::abs(expected);
 
-    // 对于float，相对误差应该小于1e-5
-    // 对于double，相对误差应该小于1e-10
-    double tolerance = std::is_same<T, float>::value ? 1e-5 : 1e-10;
+    // 新API内部会优先尝试float，如果精度不够才用double
+    // 使用较宽松的精度要求：1e-5
+    double tolerance = 1e-5;
 
-    EXPECT_LT(rel_error, tolerance)
+    ASSERT_LT(rel_error, tolerance)
         << "Test: " << test_name << ", Expected: " << expected
         << ", Actual: " << actual_d << ", Relative error: " << rel_error;
   }
@@ -350,39 +351,24 @@ protected:
 };
 
 /**
- * @brief AVX2 Float 测试
+ * @brief AVX2 测试 - 统一接口，内部自动选择精度
  */
-class PairHMMAVX2FloatTest : public PairHMMTestBase {};
+class PairHMMAVX2Test : public PairHMMTestBase {};
 
-TEST_F(PairHMMAVX2FloatTest, AllTestCases) {
+TEST_F(PairHMMAVX2Test, AllTestCases) {
   for (const auto &data : test_data_) {
     TestCaseWrapper wrapper(data);
-    float result = compute_pairhmm_avx2_float(wrapper.getTestCase());
+    double result = computeLikelihoodsAVX2(wrapper.getTestCase());
 
     SCOPED_TRACE("Line " + std::to_string(data.line_number));
-    checkResultAccuracy(result, data.expected_result, "AVX2 Float");
+    checkResultAccuracy(result, data.expected_result, "AVX2");
   }
 }
 
 /**
- * @brief AVX2 Double 测试
+ * @brief AVX512 测试 - 统一接口，内部自动选择精度
  */
-class PairHMMAVX2DoubleTest : public PairHMMTestBase {};
-
-TEST_F(PairHMMAVX2DoubleTest, AllTestCases) {
-  for (const auto &data : test_data_) {
-    TestCaseWrapper wrapper(data);
-    double result = compute_pairhmm_avx2_double(wrapper.getTestCase());
-
-    SCOPED_TRACE("Line " + std::to_string(data.line_number));
-    checkResultAccuracy(result, data.expected_result, "AVX2 Double");
-  }
-}
-
-/**
- * @brief AVX512 Float 测试
- */
-class PairHMMAVX512FloatTest : public PairHMMTestBase {
+class PairHMMAVX512Test : public PairHMMTestBase {
 protected:
   void SetUp() override {
     PairHMMTestBase::SetUp();
@@ -392,100 +378,28 @@ protected:
   }
 };
 
-TEST_F(PairHMMAVX512FloatTest, AllTestCases) {
+TEST_F(PairHMMAVX512Test, AllTestCases) {
   if (!CpuFeatureDetector::hasAVX512Support()) {
     GTEST_SKIP() << "AVX512 not supported on this system";
   }
 
   for (const auto &data : test_data_) {
     TestCaseWrapper wrapper(data);
-    float result = compute_pairhmm_avx512_float(wrapper.getTestCase());
+    double result = computeLikelihoodsAVX512(wrapper.getTestCase());
 
     SCOPED_TRACE("Line " + std::to_string(data.line_number));
-    checkResultAccuracy(result, data.expected_result, "AVX512 Float");
+    checkResultAccuracy(result, data.expected_result, "AVX512");
   }
 }
 
-/**
- * @brief AVX512 Double 测试
- */
-class PairHMMAVX512DoubleTest : public PairHMMTestBase {
-protected:
-  void SetUp() override {
-    PairHMMTestBase::SetUp();
-    if (!CpuFeatureDetector::hasAVX512Support()) {
-      GTEST_SKIP() << "AVX512 not supported on this system";
-    }
-  }
-};
-
-TEST_F(PairHMMAVX512DoubleTest, AllTestCases) {
-  if (!CpuFeatureDetector::hasAVX512Support()) {
-    GTEST_SKIP() << "AVX512 not supported on this system";
-  }
-
-  for (const auto &data : test_data_) {
-    TestCaseWrapper wrapper(data);
-    double result = compute_pairhmm_avx512_double(wrapper.getTestCase());
-
-    SCOPED_TRACE("Line " + std::to_string(data.line_number));
-    checkResultAccuracy(result, data.expected_result, "AVX512 Double");
-  }
-}
-
-/**
- * @brief 精度一致性测试
- */
-class PairHMMPrecisionConsistencyTest : public PairHMMTestBase {};
-
-TEST_F(PairHMMPrecisionConsistencyTest, AVX2FloatVsDouble) {
-  for (size_t i = 0; i < std::min(test_data_.size(), size_t(10)); ++i) {
-    const auto &data = test_data_[i];
-    TestCaseWrapper wrapper(data);
-
-    float result_float = compute_pairhmm_avx2_float(wrapper.getTestCase());
-    double result_double = compute_pairhmm_avx2_double(wrapper.getTestCase());
-
-    double rel_error =
-        std::abs(result_float - result_double) / std::abs(result_double);
-
-    SCOPED_TRACE("Line " + std::to_string(data.line_number) +
-                 " - AVX2 Float vs Double");
-    EXPECT_LT(rel_error, 1e-5)
-        << "Float: " << result_float << ", Double: " << result_double
-        << ", Relative error: " << rel_error;
-  }
-}
-
-TEST_F(PairHMMPrecisionConsistencyTest, AVX512FloatVsDouble) {
-  if (!CpuFeatureDetector::hasAVX512Support()) {
-    GTEST_SKIP() << "AVX512 not supported on this system";
-  }
-
-  for (size_t i = 0; i < std::min(test_data_.size(), size_t(10)); ++i) {
-    const auto &data = test_data_[i];
-    TestCaseWrapper wrapper(data);
-
-    float result_float = compute_pairhmm_avx512_float(wrapper.getTestCase());
-    double result_double = compute_pairhmm_avx512_double(wrapper.getTestCase());
-
-    double rel_error =
-        std::abs(result_float - result_double) / std::abs(result_double);
-
-    SCOPED_TRACE("Line " + std::to_string(data.line_number) +
-                 " - AVX512 Float vs Double");
-    EXPECT_LT(rel_error, 1e-5)
-        << "Float: " << result_float << ", Double: " << result_double
-        << ", Relative error: " << rel_error;
-  }
-}
+// 精度一致性测试已删除 - 新API内部自动选择合适的精度
 
 /**
  * @brief 指令集一致性测试
  */
 class PairHMMInstructionSetConsistencyTest : public PairHMMTestBase {};
 
-TEST_F(PairHMMInstructionSetConsistencyTest, AVX2VsAVX512Float) {
+TEST_F(PairHMMInstructionSetConsistencyTest, AVX2VsAVX512) {
   if (!CpuFeatureDetector::hasAVX512Support()) {
     GTEST_SKIP() << "AVX512 not supported on this system";
   }
@@ -494,38 +408,15 @@ TEST_F(PairHMMInstructionSetConsistencyTest, AVX2VsAVX512Float) {
     const auto &data = test_data_[i];
     TestCaseWrapper wrapper(data);
 
-    float result_avx2 = compute_pairhmm_avx2_float(wrapper.getTestCase());
-    float result_avx512 = compute_pairhmm_avx512_float(wrapper.getTestCase());
+    double result_avx2 = computeLikelihoodsAVX2(wrapper.getTestCase());
+    double result_avx512 = computeLikelihoodsAVX512(wrapper.getTestCase());
 
     double rel_error =
         std::abs(result_avx2 - result_avx512) / std::abs(result_avx512);
 
     SCOPED_TRACE("Line " + std::to_string(data.line_number) +
-                 " - AVX2 vs AVX512 Float");
-    EXPECT_LT(rel_error, 1e-5)
-        << "AVX2: " << result_avx2 << ", AVX512: " << result_avx512
-        << ", Relative error: " << rel_error;
-  }
-}
-
-TEST_F(PairHMMInstructionSetConsistencyTest, AVX2VsAVX512Double) {
-  if (!CpuFeatureDetector::hasAVX512Support()) {
-    GTEST_SKIP() << "AVX512 not supported on this system";
-  }
-
-  for (size_t i = 0; i < std::min(test_data_.size(), size_t(10)); ++i) {
-    const auto &data = test_data_[i];
-    TestCaseWrapper wrapper(data);
-
-    double result_avx2 = compute_pairhmm_avx2_double(wrapper.getTestCase());
-    double result_avx512 = compute_pairhmm_avx512_double(wrapper.getTestCase());
-
-    double rel_error =
-        std::abs(result_avx2 - result_avx512) / std::abs(result_avx512);
-
-    SCOPED_TRACE("Line " + std::to_string(data.line_number) +
-                 " - AVX2 vs AVX512 Double");
-    EXPECT_LT(rel_error, 1e-10)
+                 " - AVX2 vs AVX512");
+    ASSERT_LT(rel_error, 1e-5)
         << "AVX2: " << result_avx2 << ", AVX512: " << result_avx512
         << ", Relative error: " << rel_error;
   }
