@@ -51,13 +51,7 @@ struct AVX2FloatTraits {
         x = _mm256_blend_ps(reversed_x, _mm256_set1_ps(shift_in), 0b00000001);
     }
     
-    // 提取结果
-    static inline MainType extract_result(SimdType v, uint32_t index) {
-        alignas(alignment) MainType arr[simd_width];
-        store(arr, v);
-        return arr[index];
-    }
-    
+
     // 新增方法：用于模板实现
     static inline SimdType set_lse(MainType v) {
         return _mm256_set_ps(0, 0, 0, 0, 0, 0, 0, v);
@@ -68,7 +62,7 @@ struct AVX2FloatTraits {
         return _mm256_blendv_ps(a, b, mask);
     }
     
-    static inline SimdType castsi256(SimdIntType v) {
+    static inline SimdType castsi(SimdIntType v) {
         return _mm256_castsi256_ps(v);
     }
     
@@ -189,17 +183,10 @@ struct AVX2DoubleTraits {
         x = _mm256_blend_pd(reversed_x, _mm256_set1_pd(shift_in), 0b0001);
     }
     
-    static inline MainType extract_result(SimdType v, uint32_t index) {
-        alignas(alignment) MainType arr[simd_width];
-        store(arr, v);
-        return arr[index];
-    }
-    
     // 新增方法：用于模板实现
     static inline SimdType set_lse(MainType v) {
         return _mm256_set_pd(0, 0, 0, v);
     }
-    
     
     static inline SimdIntType get_forward_shift_vector() {
         return _mm256_set_epi64x(3, 2, 1, 0);
@@ -262,11 +249,6 @@ struct AVX512FloatTraits {
             _mm512_castps_si512(x), 0x1));
     }
     
-    static inline MainType extract_result(SimdType v, uint32_t index) {
-        alignas(alignment) MainType arr[simd_width];
-        store(arr, v);
-        return arr[index];
-    }
     
     // 新增方法：用于模板实现
     static inline SimdType set_lse(MainType v) {
@@ -378,11 +360,6 @@ struct AVX512DoubleTraits {
             _mm512_castpd_si512(x), 0x1));
     }
     
-    static inline MainType extract_result(SimdType v, uint32_t index) {
-        alignas(alignment) MainType arr[simd_width];
-        store(arr, v);
-        return arr[index];
-    }
     
     // 新增方法：用于模板实现
     static inline SimdType set_lse(MainType v) {

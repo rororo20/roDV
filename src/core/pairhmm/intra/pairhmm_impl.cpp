@@ -225,7 +225,7 @@ void PairHMMComputer<Traits>::compute_dist_vec(
     const SimdType& _1_distm)
 {
     distm_chosen = Traits::mask_blend(
-        Traits::castsi256(bit_mask_vec),
+        Traits::castsi(bit_mask_vec),
         distm, _1_distm
     );
     bit_mask_vec = Traits::backward_shift(bit_mask_vec, 1);
@@ -337,7 +337,6 @@ typename Traits::MainType PairHMMComputer<Traits>::compute(const TestCase& tc)
     
     // 处理完整的 stripes
     for (uint32_t i = 0; i < stripe_cnt - 1; ++i) {
-        _mm_prefetch(tc.rs + i * simd_width, _MM_HINT_T0);
         
         stripe_initialization(i, p_gapm, p_mm, p_mx, p_xx, p_my, p_yy, distm, _1_distm,
                             distm1d_arr, p_mm_arr, p_gapm_arr, p_mx_arr, p_xx_arr, p_my_arr, p_yy_arr,
@@ -408,7 +407,6 @@ typename Traits::MainType PairHMMComputer<Traits>::compute(const TestCase& tc)
                 sum_x = Traits::add(sum_x, x_t);
                 Traits::vector_shift_last(m_t, shift_out_m[shift_idx]);
                 Traits::vector_shift_last(x_t, shift_out_x[shift_idx]);
-                
                 Traits::vector_shift_last(y_t_1, shift_out_y[shift_idx]);
                 
                 m_t_2 = m_t_1;
