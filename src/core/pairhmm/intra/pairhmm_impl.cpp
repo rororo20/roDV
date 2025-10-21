@@ -234,11 +234,7 @@ void PairHMMComputer<Traits>::compute_dist_vec(
     const SimdType& distm,
     const SimdType& _1_distm)
 {
-    distm_chosen = Traits::mask_blend(
-        Traits::castsi(bit_mask_vec),
-        distm, _1_distm
-    );
-    bit_mask_vec = Traits::backward_shift(bit_mask_vec, 1);
+    Traits::compute_dist_vec(bit_mask_vec, distm_chosen, distm, _1_distm);
 }
 
 // ============================================================================
