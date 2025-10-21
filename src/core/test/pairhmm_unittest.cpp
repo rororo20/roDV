@@ -184,7 +184,7 @@ private:
   static std::vector<uint8_t> parseQualityString(const std::string &qual_str) {
     std::vector<uint8_t> qual;
     for (char c : qual_str) {
-      qual.push_back(static_cast<uint8_t>(c));
+      qual.push_back(static_cast<uint8_t>(c) -33);
     }
     return qual;
   }
