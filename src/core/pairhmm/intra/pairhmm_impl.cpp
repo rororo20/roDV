@@ -90,13 +90,27 @@ void PairHMMComputer<Traits>::initialize_vectors(
         const uint8_t _c = tc.c[r - 1] & 127;
         const uint8_t _q = tc.q[r - 1] & 127;
         
-        ptr_p_mm[r - 1] = ctx.set_mm_prob(_i, _d);
-        ptr_p_gapm[r - 1] = Context<MainType>::_(1.0) - Context<MainType>::ph2pr[_c];
-        ptr_p_mx[r - 1] = Context<MainType>::ph2pr[_i];
-        ptr_p_xx[r - 1] = Context<MainType>::ph2pr[_c];
-        ptr_p_my[r - 1] = Context<MainType>::ph2pr[_d];
-        ptr_p_yy[r - 1] = Context<MainType>::ph2pr[_c];
-        ptr_distm1d[r - 1] = Context<MainType>::ph2pr[_q];
+        if constexpr (Traits::simd_bits == 256) {
+            ptr_p_mm[r - 1] = ctx.set_mm_prob(_i, _d);
+            ptr_p_gapm[r - 1] = Context<MainType>::_(1.0) - Context<MainType>::ph2pr[_c];
+            ptr_p_mx[r - 1] = Context<MainType>::ph2pr[_i];
+            ptr_p_xx[r - 1] = Context<MainType>::ph2pr[_c];
+            ptr_p_my[r - 1] = Context<MainType>::ph2pr[_d];
+            ptr_p_yy[r - 1] = Context<MainType>::ph2pr[_c];
+            ptr_distm1d[r - 1] = Context<MainType>::ph2pr[_q];
+        }else{
+            int index =((r - 1)/ Traits::simd_width) * Traits::simd_width;
+            int offset = Traits::simd_width + r - index - 2;
+            ptr_p_mm[index+offset] = ctx.set_mm_prob(_i, _d);
+            ptr_p_gapm[index+offset] = Context<MainType>::_(1.0) - Context<MainType>::ph2pr[_c];
+            ptr_p_mx[index+offset] = Context<MainType>::ph2pr[_i];
+            ptr_p_xx[index+offset] = Context<MainType>::ph2pr[_c];
+            ptr_p_my[index+offset] = Context<MainType>::ph2pr[_d];
+            ptr_p_yy[index+offset] = Context<MainType>::ph2pr[_c];
+            ptr_distm1d[index+offset] = Context<MainType>::ph2pr[_q];
+        }
+       
+
     }
 }
 
@@ -170,10 +184,6 @@ void PairHMMComputer<Traits>::init_masks_for_row(
     uint32_t num_rows_to_process)
 {
     const uint8_t* dest = tc.rs + begin_row_index - 1;
-    _mm_prefetch(dest, _MM_HINT_T0);
-    _mm_prefetch(rs_arr, _MM_HINT_T0);
-    _mm_prefetch(ConvertChar::k_conversion_table, _MM_HINT_T0);
-    
     last_mask_shift_out = Traits::setzero_int();
     
     if (likely(num_rows_to_process == simd_width)) {
