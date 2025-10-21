@@ -174,7 +174,7 @@ void PairHMMComputer<Traits>::init_masks_for_row(
     _mm_prefetch(rs_arr, _MM_HINT_T0);
     _mm_prefetch(ConvertChar::k_conversion_table, _MM_HINT_T0);
     
-    last_mask_shift_out = Traits::set1_epi32(0);
+    last_mask_shift_out = Traits::setzero_int();
     
     if (likely(num_rows_to_process == simd_width)) {
         // 展开循环以优化性能
@@ -203,15 +203,15 @@ void PairHMMComputer<Traits>::update_masks_for_cols(
     
     // 构建 SIMD 向量
     typename Traits::VecIntType src = Traits::set_epi_from_array(arr, rs_arr);
-    typename Traits::VecIntType right_shift = Traits::get_right_shift_vector();
-    typename Traits::VecIntType mask_vec = Traits::srlv_epi32(src, right_shift);
+    typename Traits::VecIntType forward_shift_vec = Traits::get_forward_shift_vector();
+    typename Traits::VecIntType mask_vec = Traits::forward_shift(src, forward_shift_vec);
     bit_mask_vec = Traits::or_si256(mask_vec, last_mask_shift_out);
     
     // 计算保留的 mask
     typename Traits::VecIntType reserved_mask = Traits::get_reserved_mask();
     typename Traits::VecIntType reserved_src = Traits::and_si256(src, reserved_mask);
-    typename Traits::VecIntType left_shift = Traits::get_left_shift_vector();
-    last_mask_shift_out = Traits::sllv_epi32(reserved_src, left_shift);
+    typename Traits::VecIntType backward_shift_vec = Traits::get_backward_shift_vector();
+    last_mask_shift_out = Traits::backward_shift(reserved_src, backward_shift_vec);
 }
 
 // ============================================================================
@@ -228,7 +228,7 @@ void PairHMMComputer<Traits>::compute_dist_vec(
         Traits::castsi256(bit_mask_vec),
         distm, _1_distm
     );
-    bit_mask_vec = Traits::slli_epi32(bit_mask_vec, 1);
+    bit_mask_vec = Traits::backward_shift(bit_mask_vec, 1);
 }
 
 // ============================================================================

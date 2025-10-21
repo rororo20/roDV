@@ -30,6 +30,7 @@ struct AVX2FloatTraits {
     
     // SIMD 操作 - 全部内联，编译后零开销
     static inline SimdType set1(MainType v) { return _mm256_set1_ps(v); }
+    static inline SimdIntType setzero_int() { return _mm256_set1_epi32(0); }
     static inline SimdType setzero() { return _mm256_setzero_ps(); }
     static inline SimdType add(SimdType a, SimdType b) { return _mm256_add_ps(a, b); }
     static inline SimdType sub(SimdType a, SimdType b) { return _mm256_sub_ps(a, b); }
@@ -37,20 +38,6 @@ struct AVX2FloatTraits {
     static inline SimdType div(SimdType a, SimdType b) { return _mm256_div_ps(a, b); }
     static inline SimdType load(const MainType* ptr) { return _mm256_load_ps(ptr); }
     static inline void store(MainType* ptr, SimdType v) { _mm256_store_ps(ptr, v); }
-    
-    static inline SimdIntType set1_epi32(int32_t v) { return _mm256_set1_epi32(v); }
-    static inline SimdIntType setzero_si256() { return _mm256_setzero_si256(); }
-    
-    
-    // Blend 操作（条件选择）
-    static inline SimdType blendv_ps(SimdType a, SimdType b, SimdType mask) {
-        return _mm256_blendv_ps(a, b, mask);
-    }
-    
-    // Cast 操作
-    static inline SimdType castsi256_ps(SimdIntType v) {
-        return _mm256_castsi256_ps(v);
-    }
     
     // 向量移位操作
     static inline void vector_shift(SimdType& x, MainType shift_in, MainType& shift_out) {
@@ -76,10 +63,6 @@ struct AVX2FloatTraits {
         return _mm256_set_ps(0, 0, 0, 0, 0, 0, 0, v);
     }
     
-    static inline SimdType mask_blend_ps(SimdType mask, SimdType a, SimdType b) {
-        return _mm256_blendv_ps(a, b, mask);
-    }
-    
     // 统一接口
     static inline SimdType mask_blend(SimdType mask, SimdType a, SimdType b) {
         return _mm256_blendv_ps(a, b, mask);
@@ -98,7 +81,7 @@ struct AVX2FloatTraits {
         );
     }
     
-    static inline SimdIntType get_right_shift_vector() {
+    static inline SimdIntType get_forward_shift_vector() {
         return _mm256_set_epi32(7, 6, 5, 4, 3, 2, 1, 0);
     }
     
@@ -106,19 +89,19 @@ struct AVX2FloatTraits {
         return _mm256_set_epi32(0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01, 0x00);
     }
     
-    static inline SimdIntType get_left_shift_vector() {
+    static inline SimdIntType get_backward_shift_vector() {
         return _mm256_set_epi32(25, 26, 27, 28, 29, 30, 31, 32);
     }
     
-    static inline SimdIntType srlv_epi32(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType forward_shift(SimdIntType a, SimdIntType b) {
         return _mm256_srlv_epi32(a, b);
     }
     
-    static inline SimdIntType sllv_epi32(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType backward_shift(SimdIntType a, SimdIntType b) {
         return _mm256_sllv_epi32(a, b);
     }
     
-    static inline SimdIntType slli_epi32(SimdIntType a, int imm8) {
+    static inline SimdIntType backward_shift(SimdIntType a, int imm8) {
         return _mm256_slli_epi32(a, imm8);
     }
     
@@ -129,24 +112,7 @@ struct AVX2FloatTraits {
     static inline SimdIntType and_si256(SimdIntType a, SimdIntType b) {
         return _mm256_and_si256(a, b);
     }
-    
-    static inline SimdType permutevar8x32_ps(SimdType a, SimdIntType b) {
-        return _mm256_permutevar8x32_ps(a, b);
-    }
-    
-    static inline SimdIntType get_reverse_permute() {
-        return _mm256_set_epi32(6, 5, 4, 3, 2, 1, 0, 7);
-    }
-    
-    template<int imm8>
-    static inline SimdType blend_ps(SimdType a, SimdType b) {
-        return _mm256_blend_ps(a, b, imm8);
-    }
-    
-    static inline MainType cvtss_f32(SimdType a) {
-        return _mm256_cvtss_f32(a);
-    }
-    
+     
 };
 
 // ============================================================================
@@ -165,6 +131,7 @@ struct AVX2DoubleTraits {
     static constexpr MaskType mask_all_ones = 0xFFFFFFFFFFFFFFFF;
     
     static inline SimdType set1(MainType v) { return _mm256_set1_pd(v); }
+    static inline SimdIntType setzero_int() { return _mm256_set1_epi64x(0); }
     static inline SimdType setzero() { return _mm256_setzero_pd(); }
     static inline SimdType add(SimdType a, SimdType b) { return _mm256_add_pd(a, b); }
     static inline SimdType sub(SimdType a, SimdType b) { return _mm256_sub_pd(a, b); }
@@ -173,17 +140,6 @@ struct AVX2DoubleTraits {
     static inline SimdType load(const MainType* ptr) { return _mm256_load_pd(ptr); }
     static inline void store(MainType* ptr, SimdType v) { _mm256_store_pd(ptr, v); }
     
-    static inline SimdIntType set1_epi64x(int64_t v) { return _mm256_set1_epi64x(v); }
-    static inline SimdIntType set1_epi32(int32_t v) { return _mm256_set1_epi32(v); }
-    static inline SimdIntType setzero_si256() { return _mm256_setzero_si256(); }
-    
-    static inline SimdType blendv_pd(SimdType a, SimdType b, SimdType mask) {
-        return _mm256_blendv_pd(a, b, mask);
-    }
-    
-    static inline SimdType castsi256_pd(SimdIntType v) {
-        return _mm256_castsi256_pd(v);
-    }
     
     // 整数向量操作
     static inline SimdIntType set_epi_from_array(const MaskType* arr, const uint8_t* rs_arr) {
@@ -193,16 +149,16 @@ struct AVX2DoubleTraits {
         );
     }
     
-    static inline SimdIntType srlv_epi32(SimdIntType a, SimdIntType b) {
-        return _mm256_srlv_epi32(a, b);
+    static inline SimdIntType forward_shift(SimdIntType a, SimdIntType b) {
+        return _mm256_srlv_epi64(a, b);
     }
     
-    static inline SimdIntType sllv_epi32(SimdIntType a, SimdIntType b) {
-        return _mm256_sllv_epi32(a, b);
+    static inline SimdIntType backward_shift(SimdIntType a, SimdIntType b) {
+        return _mm256_sllv_epi64(a, b);
     }
     
-    static inline SimdIntType slli_epi32(SimdIntType a, int imm) {
-        return _mm256_slli_epi32(a, imm);
+    static inline SimdIntType backward_shift(SimdIntType a, int imm) {
+        return _mm256_slli_epi64(a, imm);
     }
     
     static inline SimdIntType or_si256(SimdIntType a, SimdIntType b) {
@@ -211,11 +167,6 @@ struct AVX2DoubleTraits {
     
     static inline SimdIntType and_si256(SimdIntType a, SimdIntType b) {
         return _mm256_and_si256(a, b);
-    }
-    
-    // Blend 操作（条件选择）
-    static inline SimdType mask_blend_pd(SimdType mask, SimdType a, SimdType b) {
-        return _mm256_blendv_pd(a, b, mask);
     }
     
     // 统一接口
@@ -250,7 +201,7 @@ struct AVX2DoubleTraits {
     }
     
     
-    static inline SimdIntType get_right_shift_vector() {
+    static inline SimdIntType get_forward_shift_vector() {
         return _mm256_set_epi64x(3, 2, 1, 0);
     }
     
@@ -258,36 +209,9 @@ struct AVX2DoubleTraits {
         return _mm256_set_epi64x(0b111, 0b11, 0b10, 0b0);
     }
     
-    static inline SimdIntType get_left_shift_vector() {
+    static inline SimdIntType get_backward_shift_vector() {
         return _mm256_set_epi64x(29, 30, 31, 32);
     }
-    
-    static inline SimdIntType srlv_epi64(SimdIntType a, SimdIntType b) {
-        return _mm256_srlv_epi64(a, b);
-    }
-    
-    static inline SimdIntType sllv_epi64(SimdIntType a, SimdIntType b) {
-        return _mm256_sllv_epi64(a, b);
-    }
-    
-    static inline SimdIntType slli_epi64(SimdIntType a, int imm8) {
-        return _mm256_slli_epi64(a, imm8);
-    }
-    
-    template<int imm8>
-    static inline SimdType permute4x64_pd(SimdType a) {
-        return _mm256_permute4x64_pd(a, imm8);
-    }
-    
-    template<int imm8>
-    static inline SimdType blend_pd(SimdType a, SimdType b) {
-        return _mm256_blend_pd(a, b, imm8);
-    }
-    
-    static inline MainType cvtsd_f64(SimdType a) {
-        return _mm256_cvtsd_f64(a);
-    }
-    
 };
 
 // ============================================================================
@@ -306,6 +230,7 @@ struct AVX512FloatTraits {
     static constexpr MaskType mask_all_ones = 0xFFFFFFFF;
     
     static inline SimdType set1(MainType v) { return _mm512_set1_ps(v); }
+    static inline SimdIntType setzero_int() { return _mm512_set1_epi32(0); }
     static inline SimdType setzero() { return _mm512_setzero_ps(); }
     static inline SimdType add(SimdType a, SimdType b) { return _mm512_add_ps(a, b); }
     static inline SimdType sub(SimdType a, SimdType b) { return _mm512_sub_ps(a, b); }
@@ -314,17 +239,9 @@ struct AVX512FloatTraits {
     static inline SimdType load(const MainType* ptr) { return _mm512_load_ps(ptr); }
     static inline void store(MainType* ptr, SimdType v) { _mm512_store_ps(ptr, v); }
     
-    static inline SimdIntType set1_epi32(int32_t v) { return _mm512_set1_epi32(v); }
-    static inline SimdIntType setzero_si512() { return _mm512_setzero_si512(); }
-    
     static inline SimdType set_high(MainType v, MainType zero) {
         return _mm512_set_ps(v, zero, zero, zero, zero, zero, zero, zero,
                             zero, zero, zero, zero, zero, zero, zero, zero);
-    }
-    
-    // AVX512 使用 mask 寄存器
-    static inline SimdType mask_blend_ps(__mmask16 mask, SimdType a, SimdType b) {
-        return _mm512_mask_blend_ps(mask, a, b);
     }
     
     static inline void vector_shift(SimdType& x, MainType shift_in, MainType& shift_out) {
@@ -370,7 +287,7 @@ struct AVX512FloatTraits {
         );
     }
     
-    static inline SimdIntType get_right_shift_vector() {
+    static inline SimdIntType get_forward_shift_vector() {
         return _mm512_set_epi32(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
     }
     
@@ -379,29 +296,22 @@ struct AVX512FloatTraits {
                                0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01, 0x00);
     }
     
-    static inline SimdIntType get_left_shift_vector() {
+    static inline SimdIntType get_backward_shift_vector() {
         return _mm512_set_epi32(17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);
     }
     
-    static inline SimdIntType srlv_epi32(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType forward_shift(SimdIntType a, SimdIntType b) {
         return _mm512_srlv_epi32(a, b);
     }
     
-    static inline SimdIntType sllv_epi32(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType backward_shift(SimdIntType a, SimdIntType b) {
         return _mm512_sllv_epi32(a, b);
     }
     
-    static inline SimdIntType slli_epi32(SimdIntType a, int imm8) {
+    static inline SimdIntType backward_shift(SimdIntType a, int imm8) {
         return _mm512_slli_epi32(a, imm8);
     }
     
-    static inline SimdIntType or_si512(SimdIntType a, SimdIntType b) {
-        return _mm512_or_si512(a, b);
-    }
-    
-    static inline SimdIntType and_si512(SimdIntType a, SimdIntType b) {
-        return _mm512_and_si512(a, b);
-    }
     
     // 别名方法，用于兼容性
     static inline SimdIntType or_si256(SimdIntType a, SimdIntType b) {
@@ -412,27 +322,6 @@ struct AVX512FloatTraits {
         return _mm512_and_si512(a, b);
     }
     
-    static inline SimdType permutevar16x32_ps(SimdType a, SimdIntType b) {
-        return _mm512_permutevar_ps(a, b);
-    }
-    
-    static inline SimdIntType get_reverse_permute() {
-        return _mm512_set_epi32(14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 15);
-    }
-    
-    static inline SimdType blend_ps(SimdType a, SimdType b, int imm8) {
-        return _mm512_mask_blend_ps(imm8, a, b);
-    }
-    
-    static inline MainType cvtss_f32(SimdType a) {
-        return _mm512_cvtss_f32(a);
-    }
-    
-    // Cast 操作
-    static inline SimdType castsi256_ps(SimdIntType v) {
-        return _mm512_castsi512_ps(v);
-    }
-    
     // 统一接口
     static inline SimdType mask_blend(SimdType mask, SimdType a, SimdType b) {
         __mmask16 mask_val = _mm512_cmp_ps_mask(mask, _mm512_setzero_ps(), _CMP_NEQ_OQ);
@@ -441,12 +330,6 @@ struct AVX512FloatTraits {
     
     static inline SimdType castsi256(SimdIntType v) {
         return _mm512_castsi512_ps(v);
-    }
-    
-    // 模板方法
-    template<int imm8>
-    static inline SimdType blend_ps(SimdType a, SimdType b) {
-        return _mm512_mask_blend_ps(imm8, a, b);
     }
     
 };
@@ -467,6 +350,7 @@ struct AVX512DoubleTraits {
     static constexpr MaskType mask_all_ones = 0xFFFFFFFFFFFFFFFF;
     
     static inline SimdType set1(MainType v) { return _mm512_set1_pd(v); }
+    static inline SimdIntType setzero_int() { return _mm512_set1_epi64(0); }
     static inline SimdType setzero() { return _mm512_setzero_pd(); }
     static inline SimdType add(SimdType a, SimdType b) { return _mm512_add_pd(a, b); }
     static inline SimdType sub(SimdType a, SimdType b) { return _mm512_sub_pd(a, b); }
@@ -474,17 +358,9 @@ struct AVX512DoubleTraits {
     static inline SimdType div(SimdType a, SimdType b) { return _mm512_div_pd(a, b); }
     static inline SimdType load(const MainType* ptr) { return _mm512_load_pd(ptr); }
     static inline void store(MainType* ptr, SimdType v) { _mm512_store_pd(ptr, v); }
-    
-    static inline SimdIntType set1_epi64(int64_t v) { return _mm512_set1_epi64(v); }
-    static inline SimdIntType set1_epi32(int32_t v) { return _mm512_set1_epi32(v); }
-    static inline SimdIntType setzero_si512() { return _mm512_setzero_si512(); }
-    
+        
     static inline SimdType set_high(MainType v, MainType zero) {
         return _mm512_set_pd(v, zero, zero, zero, zero, zero, zero, zero);
-    }
-    
-    static inline SimdType mask_blend_pd(__mmask8 mask, SimdType a, SimdType b) {
-        return _mm512_mask_blend_pd(mask, a, b);
     }
     
     static inline void vector_shift(SimdType& x, MainType shift_in, MainType& shift_out) {
@@ -521,7 +397,7 @@ struct AVX512DoubleTraits {
         return _mm512_mask_blend_pd(mask_val, a, b);
     }
     
-    static inline SimdIntType get_right_shift_vector() {
+    static inline SimdIntType get_forward_shift_vector() {
         return _mm512_set_epi64(7, 6, 5, 4, 3, 2, 1, 0);
     }
     
@@ -529,40 +405,8 @@ struct AVX512DoubleTraits {
         return _mm512_set_epi64(0x1F, 0x0F, 0x07, 0x03, 0x1F, 0x0F, 0x07, 0x03);
     }
     
-    static inline SimdIntType get_left_shift_vector() {
+    static inline SimdIntType get_backward_shift_vector() {
         return _mm512_set_epi64(61, 62, 63, 64, 61, 62, 63, 64);
-    }
-    
-    static inline SimdIntType srlv_epi64(SimdIntType a, SimdIntType b) {
-        return _mm512_srlv_epi64(a, b);
-    }
-    
-    static inline SimdIntType sllv_epi64(SimdIntType a, SimdIntType b) {
-        return _mm512_sllv_epi64(a, b);
-    }
-    
-    static inline SimdIntType slli_epi64(SimdIntType a, int imm8) {
-        return _mm512_slli_epi64(a, imm8);
-    }
-    
-    static inline SimdIntType or_si512(SimdIntType a, SimdIntType b) {
-        return _mm512_or_si512(a, b);
-    }
-    
-    static inline SimdIntType and_si512(SimdIntType a, SimdIntType b) {
-        return _mm512_and_si512(a, b);
-    }
-    
-    static inline SimdType permutevar8x64_pd(SimdType a, SimdIntType b) {
-        return _mm512_permutevar_pd(a, b);
-    }
-    
-    static inline SimdIntType get_reverse_permute() {
-        return _mm512_set_epi64(6, 5, 4, 3, 2, 1, 0, 7);
-    }
-    
-    static inline SimdType blend_pd(SimdType a, SimdType b, int imm8) {
-        return _mm512_mask_blend_pd(imm8, a, b);
     }
     
     // 整数向量操作
@@ -575,16 +419,16 @@ struct AVX512DoubleTraits {
         );
     }
     
-    static inline SimdIntType srlv_epi32(SimdIntType a, SimdIntType b) {
-        return _mm512_srlv_epi32(a, b);
+    static inline SimdIntType forward_shift(SimdIntType a, SimdIntType b) {
+        return _mm512_srlv_epi64(a, b);
     }
     
-    static inline SimdIntType sllv_epi32(SimdIntType a, SimdIntType b) {
-        return _mm512_sllv_epi32(a, b);
+    static inline SimdIntType backward_shift(SimdIntType a, SimdIntType b) {
+        return _mm512_sllv_epi64(a, b);
     }
     
-    static inline SimdIntType slli_epi32(SimdIntType a, int imm) {
-        return _mm512_slli_epi32(a, imm);
+    static inline SimdIntType backward_shift(SimdIntType a, int imm) {
+        return _mm512_slli_epi64(a, imm);
     }
     
     static inline SimdIntType or_si256(SimdIntType a, SimdIntType b) {
@@ -595,11 +439,6 @@ struct AVX512DoubleTraits {
         return _mm512_and_si512(a, b);
     }
     
-    // Cast 操作
-    static inline SimdType castsi256_pd(SimdIntType v) {
-        return _mm512_castsi512_pd(v);
-    }
-    
     // 统一接口
     static inline SimdType mask_blend(SimdType mask, SimdType a, SimdType b) {
         __mmask8 mask_val = _mm512_cmp_pd_mask(mask, _mm512_setzero_pd(), _CMP_NEQ_OQ);
@@ -608,16 +447,6 @@ struct AVX512DoubleTraits {
     
     static inline SimdType castsi256(SimdIntType v) {
         return _mm512_castsi512_pd(v);
-    }
-    
-    static inline MainType cvtsd_f64(SimdType a) {
-        return _mm512_cvtsd_f64(a);
-    }
-    
-    // 模板方法
-    template<int imm8>
-    static inline SimdType blend_pd(SimdType a, SimdType b) {
-        return _mm512_mask_blend_pd(imm8, a, b);
     }
     
 };
