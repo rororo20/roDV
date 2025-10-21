@@ -100,7 +100,7 @@ void PairHMMComputer<Traits>::initialize_vectors(
             ptr_distm1d[r - 1] = Context<MainType>::ph2pr[_q];
         }else{
             int index =((r - 1)/ Traits::simd_width) * Traits::simd_width;
-            int offset = Traits::simd_width + r - index - 2;
+            int offset = Traits::simd_width - 1 - (r - 1) % Traits::simd_width;
             ptr_p_mm[index+offset] = ctx.set_mm_prob(_i, _d);
             ptr_p_gapm[index+offset] = Context<MainType>::_(1.0) - Context<MainType>::ph2pr[_c];
             ptr_p_mx[index+offset] = Context<MainType>::ph2pr[_i];
