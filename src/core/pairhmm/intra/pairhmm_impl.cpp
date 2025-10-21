@@ -205,11 +205,11 @@ void PairHMMComputer<Traits>::update_masks_for_cols(
     typename Traits::VecIntType src = Traits::set_epi_from_array(arr, rs_arr);
     typename Traits::VecIntType forward_shift_vec = Traits::get_forward_shift_vector();
     typename Traits::VecIntType mask_vec = Traits::forward_shift(src, forward_shift_vec);
-    bit_mask_vec = Traits::or_si256(mask_vec, last_mask_shift_out);
+    bit_mask_vec = Traits::or_si(mask_vec, last_mask_shift_out);
     
     // 计算保留的 mask
     typename Traits::VecIntType reserved_mask = Traits::get_reserved_mask();
-    typename Traits::VecIntType reserved_src = Traits::and_si256(src, reserved_mask);
+    typename Traits::VecIntType reserved_src = Traits::and_si(src, reserved_mask);
     typename Traits::VecIntType backward_shift_vec = Traits::get_backward_shift_vector();
     last_mask_shift_out = Traits::backward_shift(reserved_src, backward_shift_vec);
 }

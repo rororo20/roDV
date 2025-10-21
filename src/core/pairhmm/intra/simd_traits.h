@@ -105,11 +105,11 @@ struct AVX2FloatTraits {
         return _mm256_slli_epi32(a, imm8);
     }
     
-    static inline SimdIntType or_si256(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType or_si(SimdIntType a, SimdIntType b) {
         return _mm256_or_si256(a, b);
     }
     
-    static inline SimdIntType and_si256(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType and_si(SimdIntType a, SimdIntType b) {
         return _mm256_and_si256(a, b);
     }
      
@@ -161,11 +161,11 @@ struct AVX2DoubleTraits {
         return _mm256_slli_epi64(a, imm);
     }
     
-    static inline SimdIntType or_si256(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType or_si(SimdIntType a, SimdIntType b) {
         return _mm256_or_si256(a, b);
     }
     
-    static inline SimdIntType and_si256(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType and_si(SimdIntType a, SimdIntType b) {
         return _mm256_and_si256(a, b);
     }
     
@@ -174,7 +174,7 @@ struct AVX2DoubleTraits {
         return _mm256_blendv_pd(a, b, mask);
     }
     
-    static inline SimdType castsi256(SimdIntType v) {
+    static inline SimdType castsi(SimdIntType v) {
         return _mm256_castsi256_pd(v);
     }
     
@@ -273,10 +273,7 @@ struct AVX512FloatTraits {
         return _mm512_set_ps(v, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
     
-    static inline SimdType mask_blend_ps(SimdType mask, SimdType a, SimdType b) {
-        __mmask16 mask_val = _mm512_cmp_ps_mask(mask, _mm512_setzero_ps(), _CMP_NEQ_OQ);
-        return _mm512_mask_blend_ps(mask_val, a, b);
-    }
+
     
     static inline SimdIntType set_epi_from_array(const MaskType* arr, const uint8_t* rs_arr) {
         return _mm512_set_epi32(
@@ -314,11 +311,11 @@ struct AVX512FloatTraits {
     
     
     // 别名方法，用于兼容性
-    static inline SimdIntType or_si256(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType or_si(SimdIntType a, SimdIntType b) {
         return _mm512_or_si512(a, b);
     }
     
-    static inline SimdIntType and_si256(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType and_si(SimdIntType a, SimdIntType b) {
         return _mm512_and_si512(a, b);
     }
     
@@ -328,7 +325,7 @@ struct AVX512FloatTraits {
         return _mm512_mask_blend_ps(mask_val, a, b);
     }
     
-    static inline SimdType castsi256(SimdIntType v) {
+    static inline SimdType castsi(SimdIntType v) {
         return _mm512_castsi512_ps(v);
     }
     
@@ -392,10 +389,6 @@ struct AVX512DoubleTraits {
         return _mm512_set_pd(v, 0, 0, 0, 0, 0, 0, 0);
     }
     
-    static inline SimdType mask_blend_pd(SimdType mask, SimdType a, SimdType b) {
-        __mmask8 mask_val = _mm512_cmp_pd_mask(mask, _mm512_setzero_pd(), _CMP_NEQ_OQ);
-        return _mm512_mask_blend_pd(mask_val, a, b);
-    }
     
     static inline SimdIntType get_forward_shift_vector() {
         return _mm512_set_epi64(7, 6, 5, 4, 3, 2, 1, 0);
@@ -431,11 +424,11 @@ struct AVX512DoubleTraits {
         return _mm512_slli_epi64(a, imm);
     }
     
-    static inline SimdIntType or_si256(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType or_si(SimdIntType a, SimdIntType b) {
         return _mm512_or_si512(a, b);
     }
     
-    static inline SimdIntType and_si256(SimdIntType a, SimdIntType b) {
+    static inline SimdIntType and_si(SimdIntType a, SimdIntType b) {
         return _mm512_and_si512(a, b);
     }
     
@@ -445,7 +438,7 @@ struct AVX512DoubleTraits {
         return _mm512_mask_blend_pd(mask_val, a, b);
     }
     
-    static inline SimdType castsi256(SimdIntType v) {
+    static inline SimdType castsi(SimdIntType v) {
         return _mm512_castsi512_pd(v);
     }
     
