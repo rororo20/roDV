@@ -430,7 +430,11 @@ typename Traits::MainType PairHMMComputer<Traits>::compute(const TestCase& tc)
         alignas(64) MainType x_result[simd_width];
         Traits::store(m_result, sum_m);
         Traits::store(x_result, sum_x);
-        return m_result[remaining_rows - 1] + x_result[remaining_rows - 1];
+        if  constexpr (Traits::simd_bits == 256) {
+            return m_result[remaining_rows - 1] + x_result[remaining_rows - 1];
+        } else {
+            return m_result[simd_width - remaining_rows] + x_result[simd_width - remaining_rows];
+        }
     }
 }
 
