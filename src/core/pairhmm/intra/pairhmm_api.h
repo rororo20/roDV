@@ -1,7 +1,7 @@
 #ifndef PAIRHMM_API_H_
 #define PAIRHMM_API_H_
 
-#include "common.h"
+#include "../common/common.h"
 
 namespace pairhmm {
 namespace intra {

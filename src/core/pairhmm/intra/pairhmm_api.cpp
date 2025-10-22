@@ -9,6 +9,19 @@ namespace intra {
 constexpr float LOG10_INITIAL_CONSTANT_F = 36.1236000061;
 constexpr double LOG10_INITIAL_CONSTANT_D = 307.050595577260822;
 
+// 注意：AVX512 编译时 GCC 也会定义 __AVX2__，所以需要先检查 AVX512
+#if defined(__AVX512F__)
+double computeLikelihoodsAVX512(const TestCase &tc) {
+  double result_final = PairHMMComputer<AVX512FloatTraits>::compute(tc);
+  if (result_final < MIN_ACCEPTED) {
+    result_final = PairHMMComputer<AVX512DoubleTraits>::compute(tc);
+    result_final = log10(result_final) - LOG10_INITIAL_CONSTANT_D;
+  } else {
+    result_final = log10f(result_final) - LOG10_INITIAL_CONSTANT_F;
+  }
+  return result_final;
+}
+#elif defined(__AVX2__)
 double computeLikelihoodsAVX2(const TestCase &tc) {
 
   double result_final = PairHMMComputer<AVX2FloatTraits>::compute(tc);
@@ -21,17 +34,7 @@ double computeLikelihoodsAVX2(const TestCase &tc) {
   }
   return result_final;
 }
-
-double computeLikelihoodsAVX512(const TestCase &tc) {
-  double result_final = PairHMMComputer<AVX512FloatTraits>::compute(tc);
-  if (result_final < MIN_ACCEPTED) {
-    result_final = PairHMMComputer<AVX512DoubleTraits>::compute(tc);
-    result_final = log10(result_final) - LOG10_INITIAL_CONSTANT_D;
-  } else {
-    result_final = log10f(result_final) - LOG10_INITIAL_CONSTANT_F;
-  }
-  return result_final;
-}
+#endif
 
 } // namespace intra
 } // namespace pairhmm

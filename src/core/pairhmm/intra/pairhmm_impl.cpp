@@ -440,15 +440,17 @@ typename Traits::MainType PairHMMComputer<Traits>::compute(const TestCase& tc)
 
 // ============================================================================
 // 显式实例化（编译器会生成具体代码）
+// 根据编译标志选择性实例化
+// 注意：AVX512 编译时 GCC 也会定义 __AVX2__，所以需要先检查 AVX512
 // ============================================================================
-// 始终实例化 AVX2 版本
-template class PairHMMComputer<AVX2FloatTraits>;
-template class PairHMMComputer<AVX2DoubleTraits>;
-
-// 仅在支持 AVX512 时实例化 AVX512 版本
-#ifdef __AVX512F__
+#if defined(__AVX512F__)
+// 实例化 AVX512 版本
 template class PairHMMComputer<AVX512FloatTraits>;
 template class PairHMMComputer<AVX512DoubleTraits>;
+#elif defined(__AVX2__)
+// 实例化 AVX2 版本
+template class PairHMMComputer<AVX2FloatTraits>;
+template class PairHMMComputer<AVX2DoubleTraits>;
 #endif
 
 }  // namespace intra

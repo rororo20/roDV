@@ -1,8 +1,8 @@
 #ifndef PAIRHMM_IMPL_H_
 #define PAIRHMM_IMPL_H_
 
-#include "common.h"
-#include "context.h"
+#include "../common/common.h"
+#include "../common/context.h"
 #include "simd_traits.h"
 #include <algorithm>
 #include <cstdint>

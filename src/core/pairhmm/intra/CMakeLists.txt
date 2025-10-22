@@ -56,7 +56,7 @@ install(TARGETS pairhmm_intra_avx512
 # 安装头文件
 install(FILES 
     pairhmm_api.h
-    common.h
-    context.h
     simd_traits.h
+    simd_traits_avx2.h
+    simd_traits_avx512.h
     DESTINATION include/pairhmm/intra)

@@ -1,49 +1,20 @@
 #include "../pairhmm/intra/pairhmm_api.h"
+#include "../pairhmm/common/cpu_features.h"
 #include <cmath>
-#include <cpuid.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <gtest/gtest.h>
-#include <immintrin.h>
 #include <iostream>
-#include <malloc.h>
 #include <memory>
 #include <new>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <x86intrin.h>
 
 using namespace pairhmm::intra;
-
-inline int check_xcr0_ymm()
-{
-    uint32_t xcr0;
-#if defined(_MSC_VER)
-    xcr0 = (uint32_t)_xgetbv(0);
-#else
-    __asm__("xgetbv" : "=a"(xcr0) : "c"(0) : "%edx");
-#endif
-    return ((xcr0 & 6) == 6);
-}
-
-// helper function
-inline int check_xcr0_zmm()
-{
-    uint32_t xcr0;
-    uint32_t zmm_ymm_xmm = (7 << 5) | (1 << 2) | (1 << 1);
-#if defined(_MSC_VER)
-    /* min VS2010 SP1 compiler is required */
-    xcr0 = (uint32_t)_xgetbv(0);
-#else
-    __asm__("xgetbv" : "=a"(xcr0) : "c"(0) : "%edx");
-#endif
-    /* check if xmm, zmm and zmm state are enabled in XCR0 */
-    return ((xcr0 & zmm_ymm_xmm) == zmm_ymm_xmm);
-}
-
+using pairhmm::common::CpuFeatures;
 
 /**
  * @brief PairHMM Unit Tests using GoogleTest
@@ -53,64 +24,6 @@ inline int check_xcr0_zmm()
  * hap-bases read-bases read-qual read-ins-qual read-del-qual gcp
  * expected-result
  */
-
-/**
- * @brief CPU指令集检测工具
- */
-class CpuFeatureDetector {
-public:
-  /**
-   * @brief 检测当前CPU是否支持AVX512指令集
-   * @return true 如果支持AVX512，false 否则
-   */
-  static bool hasAVX512Support() {
-    static bool checked = false;
-    static bool result = false;
-
-    if (!checked) {
-      result = checkAVX512Support();
-      checked = true;
-    }
-
-    return result;
-  }
-
-private:
-  /**
-   * @brief 实际检测AVX512支持的实现
-   */
-  static bool checkAVX512Support() {
-#ifndef __APPLE__
-    uint32_t a, b, c, d;
-    uint32_t osxsave_mask = (1 << 27);     // OSX.
-    uint32_t avx512_skx_mask = (1 << 16) | // AVX-512F
-                               (1 << 17) | // AVX-512DQ
-                               (1 << 30) | // AVX-512BW
-                               (1 << 31);  // AVX-512VL
-
-    // step 1 - must ensure OS supports extended processor state management
-    __cpuid_count(1, 0, a, b, c, d);
-    if ((c & osxsave_mask) != osxsave_mask) {
-      return true;
-    }
-
-    // step 2 - must ensure OS supports ZMM registers (and YMM, and XMM)
-    if (!check_xcr0_zmm()) {
-      return false;
-    }
-
-    // step 3 - must ensure AVX512 is supported
-    __cpuid_count(7, 0, a, b, c, d);
-    if ((b & avx512_skx_mask) != avx512_skx_mask) {
-      return false;
-    }
-
-    return true;
-#else
-    return false;
-#endif
-  }
-};
 
 /**
  * @brief 测试用例数据结构
@@ -372,14 +285,14 @@ class PairHMMAVX512Test : public PairHMMTestBase {
 protected:
   void SetUp() override {
     PairHMMTestBase::SetUp();
-    if (!CpuFeatureDetector::hasAVX512Support()) {
+    if (!CpuFeatures::hasAVX512Support()) {
       GTEST_SKIP() << "AVX512 not supported on this system";
     }
   }
 };
 
 TEST_F(PairHMMAVX512Test, AllTestCases) {
-  if (!CpuFeatureDetector::hasAVX512Support()) {
+  if (!CpuFeatures::hasAVX512Support()) {
     GTEST_SKIP() << "AVX512 not supported on this system";
   }
 
@@ -400,7 +313,7 @@ TEST_F(PairHMMAVX512Test, AllTestCases) {
 class PairHMMInstructionSetConsistencyTest : public PairHMMTestBase {};
 
 TEST_F(PairHMMInstructionSetConsistencyTest, AVX2VsAVX512) {
-  if (!CpuFeatureDetector::hasAVX512Support()) {
+  if (!CpuFeatures::hasAVX512Support()) {
     GTEST_SKIP() << "AVX512 not supported on this system";
   }
 
@@ -429,7 +342,7 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
   // 打印系统信息
-  if (CpuFeatureDetector::hasAVX512Support()) {
+  if (CpuFeatures::hasAVX512Support()) {
     std::cout << "AVX512 support detected - running all tests\n";
   } else {
     std::cout << "AVX512 not supported - skipping AVX512 tests\n";
