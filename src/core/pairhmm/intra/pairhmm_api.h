@@ -2,6 +2,7 @@
 #define PAIRHMM_API_H_
 
 #include "../common/common.h"
+using namespace pairhmm::common;
 
 namespace pairhmm {
 namespace intra {

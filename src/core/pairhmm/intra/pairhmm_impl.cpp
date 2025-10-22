@@ -2,6 +2,7 @@
 #include <cstring>
 #include <algorithm>
 
+using namespace pairhmm::common;
 namespace pairhmm {
 namespace intra {
 

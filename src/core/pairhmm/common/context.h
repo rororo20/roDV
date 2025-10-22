@@ -5,7 +5,7 @@
 #include <cmath>
 
 namespace pairhmm {
-namespace intra {
+namespace common {
 
 #define MAX_QUAL                    254
 #define MAX_JACOBIAN_TOLERANCE      8.0
@@ -188,7 +188,7 @@ NUMBER ContextBase<NUMBER>::jacobianLogTable[JACOBIAN_LOG_TABLE_SIZE];
 template <typename NUMBER>
 NUMBER ContextBase<NUMBER>::matchToMatchProb[((MAX_QUAL + 1) * (MAX_QUAL + 2)) >> 1];
 
-}  // namespace intra
+}  // namespace common
 }  // namespace pairhmm
 
 #endif  // PAIRHMM_CONTEXT_H_

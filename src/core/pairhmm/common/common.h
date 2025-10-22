@@ -5,7 +5,7 @@
 #include <x86intrin.h>
 
 namespace pairhmm {
-namespace intra {
+namespace common {
 
 // 内存对齐宏
 #define ALIGNED32   __attribute__((aligned(32)))
@@ -55,7 +55,7 @@ struct ConvertChar {
     }
 };
 
-}  // namespace intra
+}  // namespace common
 }  // namespace pairhmm
 
 #endif  // PAIRHMM_COMMON_H_

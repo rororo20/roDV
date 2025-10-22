@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cstdint>
 
+using namespace pairhmm::common;
+
 namespace pairhmm {
 namespace intra {
 

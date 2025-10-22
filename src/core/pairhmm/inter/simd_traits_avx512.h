@@ -1,0 +1,152 @@
+#ifndef PAIRHMM_INTER_SIMD_TRAITS_AVX512_H_
+#define PAIRHMM_INTER_SIMD_TRAITS_AVX512_H_
+
+#include "../common/common.h"
+#include "../common/context.h"
+#include <immintrin.h>
+#include <x86intrin.h>
+
+namespace pairhmm {
+using namespace common;
+namespace inter {
+/**
+ * @brief AVX512 SIMD Traits for Inter-PairHMM
+ *
+ * 支持多个 reads 与多个单倍型的并发计算
+ * 使用 AVX512 指令集（512-bit）
+ */
+
+// ============================================================================
+// AVX512 Float Traits (512-bit, 16 个 float)
+// ============================================================================
+struct AVX512FloatTraits {
+  using MainType = float;
+  using SimdType = __m512;
+  using SimdIntType = __m512i;
+  using MaskType = uint32_t;
+
+  static constexpr uint32_t simd_width = 16;
+  static constexpr uint32_t simd_bits = 512;
+
+  // 基础 SIMD 操作
+  static inline SimdType set1(MainType v) { return _mm512_set1_ps(v); }
+  static inline SimdType setzero() { return _mm512_setzero_ps(); }
+  static inline SimdType add(SimdType a, SimdType b) {
+    return _mm512_add_ps(a, b);
+  }
+  static inline SimdType sub(SimdType a, SimdType b) {
+    return _mm512_sub_ps(a, b);
+  }
+  static inline SimdType mul(SimdType a, SimdType b) {
+    return _mm512_mul_ps(a, b);
+  }
+  static inline SimdType div(SimdType a, SimdType b) {
+    return _mm512_div_ps(a, b);
+  }
+  static inline SimdType load(const MainType *ptr) {
+    return _mm512_load_ps(ptr);
+  }
+  static inline void store(MainType *ptr, SimdType v) {
+    _mm512_store_ps(ptr, v);
+  }
+  // 特殊操作：用于生成长度掩码
+  static inline __mmask16 generate_length_mask(uint32_t read_idx,
+                                               const uint32_t *lens) {
+    __m512i idx = _mm512_set1_epi32(read_idx);
+    __m512i len =
+        _mm512_set_epi32(lens[0], lens[1], lens[2], lens[3], lens[4], lens[5],
+                         lens[6], lens[7], lens[8], lens[9], lens[10], lens[11],
+                         lens[12], lens[13], lens[14], lens[15]);
+    return _mm512_cmp_epu32_mask(len, idx, _MM_CMPINT_NLE);
+  }
+
+  static inline SimdType set_init_d(const uint32_t *hap_lens) {
+    MainType init_const = Context<MainType>::INITIAL_CONSTANT;
+    return _mm512_set_ps(init_const / static_cast<MainType>(hap_lens[0]),
+                         init_const / static_cast<MainType>(hap_lens[1]),
+                         init_const / static_cast<MainType>(hap_lens[2]),
+                         init_const / static_cast<MainType>(hap_lens[3]),
+                         init_const / static_cast<MainType>(hap_lens[4]),
+                         init_const / static_cast<MainType>(hap_lens[5]),
+                         init_const / static_cast<MainType>(hap_lens[6]),
+                         init_const / static_cast<MainType>(hap_lens[7]),
+                         init_const / static_cast<MainType>(hap_lens[8]),
+                         init_const / static_cast<MainType>(hap_lens[9]),
+                         init_const / static_cast<MainType>(hap_lens[10]),
+                         init_const / static_cast<MainType>(hap_lens[11]),
+                         init_const / static_cast<MainType>(hap_lens[12]),
+                         init_const / static_cast<MainType>(hap_lens[13]),
+                         init_const / static_cast<MainType>(hap_lens[14]),
+                         init_const / static_cast<MainType>(hap_lens[15]));
+  }
+
+  // 特殊操作：用于测试 read 和 haplotype 匹配
+  static inline __mmask16 test_read_hap_match(SimdIntType read,
+                                              SimdIntType hap) {
+    return _mm512_test_epi32_mask(read, hap);
+  }
+};
+
+// ============================================================================
+// AVX512 Double Traits (512-bit, 8 个 double)
+// ============================================================================
+struct AVX512DoubleTraits {
+  using MainType = double;
+  using SimdType = __m512d;
+  using SimdIntType = __m512i;
+  using MaskType = uint64_t;
+
+  static constexpr uint32_t simd_width = 8;
+  static constexpr uint32_t simd_bits = 512;
+
+  // 基础 SIMD 操作
+  static inline SimdType set1(MainType v) { return _mm512_set1_pd(v); }
+  static inline SimdType setzero() { return _mm512_setzero_pd(); }
+  static inline SimdType add(SimdType a, SimdType b) {
+    return _mm512_add_pd(a, b);
+  }
+  static inline SimdType sub(SimdType a, SimdType b) {
+    return _mm512_sub_pd(a, b);
+  }
+  static inline SimdType mul(SimdType a, SimdType b) {
+    return _mm512_mul_pd(a, b);
+  }
+  static inline SimdType div(SimdType a, SimdType b) {
+    return _mm512_div_pd(a, b);
+  }
+  static inline SimdType load(const MainType *ptr) {
+    return _mm512_load_pd(ptr);
+  }
+  static inline void store(MainType *ptr, SimdType v) {
+    _mm512_store_pd(ptr, v);
+  }
+
+  static inline SimdType mask_blend(__mmask8 mask, SimdType a, SimdType b) {
+    return _mm512_mask_blend_pd(mask, a, b);
+  }
+
+  static inline SimdType set_init_d(const uint32_t *hap_lens) {
+    MainType init_const = Context<MainType>::INITIAL_CONSTANT;
+    return _mm512_set_pd(init_const / static_cast<MainType>(hap_lens[0]),
+                         init_const / static_cast<MainType>(hap_lens[1]),
+                         init_const / static_cast<MainType>(hap_lens[2]),
+                         init_const / static_cast<MainType>(hap_lens[3]),
+                         init_const / static_cast<MainType>(hap_lens[4]),
+                         init_const / static_cast<MainType>(hap_lens[5]),
+                         init_const / static_cast<MainType>(hap_lens[6]),
+                         init_const / static_cast<MainType>(hap_lens[7]));
+  }
+  // 特殊操作：用于生成长度掩码
+  static inline __mmask8 generate_length_mask(uint32_t read_idx,
+                                              const uint32_t *lens) {
+    __m512i idx = _mm512_set1_epi64(read_idx);
+    __m512i len = _mm512_set_epi64(lens[0], lens[1], lens[2], lens[3], lens[4],
+                                   lens[5], lens[6], lens[7]);
+    return _mm512_cmp_epu64_mask(len, idx, _MM_CMPINT_NLE);
+  }
+};
+
+} // namespace inter
+} // namespace pairhmm
+
+#endif // PAIRHMM_INTER_SIMD_TRAITS_AVX512_H_
