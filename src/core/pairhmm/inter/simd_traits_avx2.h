@@ -23,6 +23,7 @@ namespace inter {
 // ============================================================================
 struct AVX2FloatTraits {
   using MainType = float;
+  using SeqType = int32_t;
   using SimdType = __m256;
   using SimdIntType = __m256i;
   using MaskType = __m256i;
@@ -31,6 +32,9 @@ struct AVX2FloatTraits {
   static constexpr uint32_t simd_bits = 256;
   static constexpr uint32_t alignment = 32;
   // 基础 SIMD 操作
+  static inline MaskType set1_all_mask() {
+    return _mm256_set1_epi32(0xffffffff);
+  }
   static inline SimdType set1(MainType v) { return _mm256_set1_ps(v); }
   static inline SimdType setzero() { return _mm256_setzero_ps(); }
   static inline SimdType add(SimdType a, SimdType b) {
@@ -48,8 +52,8 @@ struct AVX2FloatTraits {
   static inline SimdType load(const MainType *ptr) {
     return _mm256_load_ps(ptr);
   }
-  static inline SimdIntType load_seqs(const uint8_t *ptr) {
-    return _mm256_loadu_si256((const __m256i*)ptr);
+  static inline SimdIntType load_seqs(const SeqType *ptr) {
+    return _mm256_loadu_si256((const __m256i *)ptr);
   }
   static inline void store(MainType *ptr, SimdType v) {
     _mm256_store_ps(ptr, v);
@@ -72,12 +76,15 @@ struct AVX2FloatTraits {
                          init_const / static_cast<MainType>(hap_lens[0]));
   }
   // 特殊操作：用于生成长度掩码
-  static inline SimdIntType generate_length_mask(uint32_t read_idx,
-                                                 const uint32_t *lens) {
+  static inline MaskType generate_length_mask(uint32_t read_idx,
+                                              const uint32_t *lens) {
     __m256i idx = _mm256_set1_epi32(read_idx);
     __m256i len = _mm256_set_epi32(lens[7], lens[6], lens[5], lens[4], lens[3],
                                    lens[2], lens[1], lens[0]);
     return _mm256_cmpgt_epi32(len, idx);
+  }
+  static inline MaskType mask_and(MaskType a, MaskType b) {
+    return _mm256_and_si256(a, b);
   }
 };
 
@@ -86,13 +93,17 @@ struct AVX2FloatTraits {
 // ============================================================================
 struct AVX2DoubleTraits {
   using MainType = double;
+  using SeqType = int64_t;
   using SimdType = __m256d;
   using SimdIntType = __m256i;
-  using MaskType = __mmask8;
+  using MaskType = __m256i;
 
   static constexpr uint32_t simd_width = 4;
   static constexpr uint32_t simd_bits = 256;
   // 基础 SIMD 操作
+  static inline MaskType set1_all_mask() {
+    return _mm256_set1_epi64x(0xffffffffffffffff);
+  }
   static inline SimdType set1(MainType v) { return _mm256_set1_pd(v); }
   static inline SimdType setzero() { return _mm256_setzero_pd(); }
   static inline SimdType add(SimdType a, SimdType b) {
@@ -110,21 +121,19 @@ struct AVX2DoubleTraits {
   static inline SimdType load(const MainType *ptr) {
     return _mm256_load_pd(ptr);
   }
-  static inline SimdIntType load_seqs(const uint8_t *ptr) {
-    return _mm256_loadu_si256((const __m256i*)ptr);
+  static inline SimdIntType load_seqs(const SeqType *ptr) {
+    return _mm256_loadu_si256((const __m256i *)ptr);
   }
   static inline void store(MainType *ptr, SimdType v) {
     _mm256_store_pd(ptr, v);
   }
 
   static inline MaskType test_cmpeq(SimdIntType a, SimdIntType b) {
-    __m256i cmp = _mm256_cmpeq_epi64(a, b);
-    return _mm256_movemask_pd(_mm256_castsi256_pd(cmp));
+    return _mm256_cmpeq_epi64(a, b);
   }
 
   static inline SimdType mask_blend(MaskType mask, SimdType a, SimdType b) {
-    __m256d mask_vec = _mm256_castsi256_pd(_mm256_set1_epi64x(mask));
-    return _mm256_blendv_pd(b, a, mask_vec);
+    return _mm256_blendv_pd(b, a, _mm256_castsi256_pd(mask));
   }
   static inline SimdType set_init_d(const uint32_t *hap_lens) {
     MainType init_const = Context<MainType>::INITIAL_CONSTANT;
@@ -134,13 +143,16 @@ struct AVX2DoubleTraits {
                          init_const / static_cast<MainType>(hap_lens[3]));
   }
   // 特殊操作：用于生成长度掩码
-  static inline SimdIntType generate_length_mask(uint32_t read_idx,
-                                                 const uint32_t *lens) {
+  static inline MaskType generate_length_mask(uint32_t read_idx,
+                                              const uint32_t *lens) {
     __m256i idx = _mm256_set1_epi64x(read_idx);
     __m256i len = _mm256_set_epi64x(
         static_cast<uint64_t>(lens[3]), static_cast<uint64_t>(lens[2]),
         static_cast<uint64_t>(lens[1]), static_cast<uint64_t>(lens[0]));
     return _mm256_cmpgt_epi64(len, idx);
+  }
+  static inline MaskType mask_and(MaskType a, MaskType b) {
+    return _mm256_and_si256(a, b);
   }
 };
 

@@ -3,6 +3,7 @@
 
 #include "../common/common.h"
 #include "../common/context.h"
+#include <boost/integer_fwd.hpp>
 #include <immintrin.h>
 #include <x86intrin.h>
 
@@ -22,6 +23,7 @@ namespace inter {
 struct AVX512FloatTraits {
   using MainType = float;
   using SimdType = __m512;
+  using SeqType = int32_t;
   using SimdIntType = __m512i;
   using MaskType = __mmask16;
 
@@ -29,6 +31,7 @@ struct AVX512FloatTraits {
   static constexpr uint32_t simd_bits = 512;
 
   // 基础 SIMD 操作
+  static inline MaskType set1_all_mask() { return 0xffff; }
   static inline SimdType set1(MainType v) { return _mm512_set1_ps(v); }
   static inline SimdType setzero() { return _mm512_setzero_ps(); }
   static inline SimdType add(SimdType a, SimdType b) {
@@ -47,7 +50,7 @@ struct AVX512FloatTraits {
     return _mm512_load_ps(ptr);
   }
 
-  static inline SimdIntType load_seqs(const uint8_t *ptr) {
+  static inline SimdIntType load_seqs(const SeqType *ptr) {
     return _mm512_load_epi32(ptr);
   }
 
@@ -62,8 +65,8 @@ struct AVX512FloatTraits {
     _mm512_store_ps(ptr, v);
   }
   // 特殊操作：用于生成长度掩码
-  static inline __mmask16 generate_length_mask(uint32_t read_idx,
-                                               const uint32_t *lens) {
+  static inline MaskType generate_length_mask(uint32_t read_idx,
+                                              const uint32_t *lens) {
     __m512i idx = _mm512_set1_epi32(read_idx);
     __m512i len =
         _mm512_set_epi32(lens[0], lens[1], lens[2], lens[3], lens[4], lens[5],
@@ -91,11 +94,8 @@ struct AVX512FloatTraits {
                          init_const / static_cast<MainType>(hap_lens[14]),
                          init_const / static_cast<MainType>(hap_lens[15]));
   }
-
-  // 特殊操作：用于测试 read 和 haplotype 匹配
-  static inline __mmask16 test_read_hap_match(SimdIntType read,
-                                              SimdIntType hap) {
-    return _mm512_test_epi32_mask(read, hap);
+  static inline MaskType mask_and(MaskType a, MaskType b) {
+    return _kand_mask16(a, b);
   }
 };
 
@@ -106,12 +106,14 @@ struct AVX512DoubleTraits {
   using MainType = double;
   using SimdType = __m512d;
   using SimdIntType = __m512i;
+  using SeqType = int64_t;
   using MaskType = __mmask8;
 
   static constexpr uint32_t simd_width = 8;
   static constexpr uint32_t simd_bits = 512;
 
   // 基础 SIMD 操作
+  static inline MaskType set1_all_mask() { return 0xff; }
   static inline SimdType set1(MainType v) { return _mm512_set1_pd(v); }
   static inline SimdType setzero() { return _mm512_setzero_pd(); }
   static inline SimdType add(SimdType a, SimdType b) {
@@ -133,7 +135,7 @@ struct AVX512DoubleTraits {
   static inline void store(MainType *ptr, SimdType v) {
     _mm512_store_pd(ptr, v);
   }
-  static inline SimdIntType load_seqs(const uint8_t *ptr) {
+  static inline SimdIntType load_seqs(const SeqType *ptr) {
     return _mm512_load_epi64(ptr);
   }
   static inline MaskType test_cmpeq(SimdIntType a, SimdIntType b) {
@@ -155,12 +157,16 @@ struct AVX512DoubleTraits {
                          init_const / static_cast<MainType>(hap_lens[7]));
   }
   // 特殊操作：用于生成长度掩码
-  static inline __mmask8 generate_length_mask(uint32_t read_idx,
+  static inline MaskType generate_length_mask(uint32_t read_idx,
                                               const uint32_t *lens) {
     __m512i idx = _mm512_set1_epi64(read_idx);
     __m512i len = _mm512_set_epi64(lens[0], lens[1], lens[2], lens[3], lens[4],
                                    lens[5], lens[6], lens[7]);
     return _mm512_cmp_epu64_mask(len, idx, _MM_CMPINT_NLE);
+  }
+
+  static inline MaskType mask_and(MaskType a, MaskType b) {
+    return _kand_mask8(a, b);
   }
 };
 
