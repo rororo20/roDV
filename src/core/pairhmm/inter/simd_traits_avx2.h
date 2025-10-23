@@ -25,7 +25,7 @@ struct AVX2FloatTraits {
   using MainType = float;
   using SimdType = __m256;
   using SimdIntType = __m256i;
-  using MaskType = uint32_t;
+  using MaskType = __m256i;
 
   static constexpr uint32_t simd_width = 8;
   static constexpr uint32_t simd_bits = 256;
@@ -48,8 +48,17 @@ struct AVX2FloatTraits {
   static inline SimdType load(const MainType *ptr) {
     return _mm256_load_ps(ptr);
   }
+  static inline SimdIntType load_seqs(const uint8_t *ptr) {
+    return _mm256_loadu_si256((const __m256i*)ptr);
+  }
   static inline void store(MainType *ptr, SimdType v) {
     _mm256_store_ps(ptr, v);
+  }
+  static inline MaskType test_cmpeq(SimdIntType a, SimdIntType b) {
+    return _mm256_cmpeq_epi32(a, b);
+  }
+  static inline SimdType mask_blend(MaskType mask, SimdType a, SimdType b) {
+    return _mm256_blendv_ps(b, a, _mm256_castsi256_ps(mask));
   }
   static inline SimdType set_init_d(const uint32_t *hap_lens) {
     MainType init_const = Context<MainType>::INITIAL_CONSTANT;
@@ -79,7 +88,7 @@ struct AVX2DoubleTraits {
   using MainType = double;
   using SimdType = __m256d;
   using SimdIntType = __m256i;
-  using MaskType = uint64_t;
+  using MaskType = __mmask8;
 
   static constexpr uint32_t simd_width = 4;
   static constexpr uint32_t simd_bits = 256;
@@ -101,8 +110,21 @@ struct AVX2DoubleTraits {
   static inline SimdType load(const MainType *ptr) {
     return _mm256_load_pd(ptr);
   }
+  static inline SimdIntType load_seqs(const uint8_t *ptr) {
+    return _mm256_loadu_si256((const __m256i*)ptr);
+  }
   static inline void store(MainType *ptr, SimdType v) {
     _mm256_store_pd(ptr, v);
+  }
+
+  static inline MaskType test_cmpeq(SimdIntType a, SimdIntType b) {
+    __m256i cmp = _mm256_cmpeq_epi64(a, b);
+    return _mm256_movemask_pd(_mm256_castsi256_pd(cmp));
+  }
+
+  static inline SimdType mask_blend(MaskType mask, SimdType a, SimdType b) {
+    __m256d mask_vec = _mm256_castsi256_pd(_mm256_set1_epi64x(mask));
+    return _mm256_blendv_pd(b, a, mask_vec);
   }
   static inline SimdType set_init_d(const uint32_t *hap_lens) {
     MainType init_const = Context<MainType>::INITIAL_CONSTANT;
@@ -120,8 +142,6 @@ struct AVX2DoubleTraits {
         static_cast<uint64_t>(lens[1]), static_cast<uint64_t>(lens[0]));
     return _mm256_cmpgt_epi64(len, idx);
   }
-
-  
 };
 
 } // namespace inter

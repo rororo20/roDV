@@ -23,7 +23,7 @@ struct AVX512FloatTraits {
   using MainType = float;
   using SimdType = __m512;
   using SimdIntType = __m512i;
-  using MaskType = uint32_t;
+  using MaskType = __mmask16;
 
   static constexpr uint32_t simd_width = 16;
   static constexpr uint32_t simd_bits = 512;
@@ -45,6 +45,18 @@ struct AVX512FloatTraits {
   }
   static inline SimdType load(const MainType *ptr) {
     return _mm512_load_ps(ptr);
+  }
+
+  static inline SimdIntType load_seqs(const uint8_t *ptr) {
+    return _mm512_load_epi32(ptr);
+  }
+
+  static inline MaskType test_cmpeq(SimdIntType a, SimdIntType b) {
+    return _mm512_test_epi32_mask(a, b);
+  }
+
+  static inline SimdType mask_blend(MaskType mask, SimdType a, SimdType b) {
+    return _mm512_mask_blend_ps(mask, a, b);
   }
   static inline void store(MainType *ptr, SimdType v) {
     _mm512_store_ps(ptr, v);
@@ -94,7 +106,7 @@ struct AVX512DoubleTraits {
   using MainType = double;
   using SimdType = __m512d;
   using SimdIntType = __m512i;
-  using MaskType = uint64_t;
+  using MaskType = __mmask8;
 
   static constexpr uint32_t simd_width = 8;
   static constexpr uint32_t simd_bits = 512;
@@ -117,11 +129,17 @@ struct AVX512DoubleTraits {
   static inline SimdType load(const MainType *ptr) {
     return _mm512_load_pd(ptr);
   }
+
   static inline void store(MainType *ptr, SimdType v) {
     _mm512_store_pd(ptr, v);
   }
-
-  static inline SimdType mask_blend(__mmask8 mask, SimdType a, SimdType b) {
+  static inline SimdIntType load_seqs(const uint8_t *ptr) {
+    return _mm512_load_epi64(ptr);
+  }
+  static inline MaskType test_cmpeq(SimdIntType a, SimdIntType b) {
+    return _mm512_test_epi64_mask(a, b);
+  }
+  static inline SimdType mask_blend(MaskType mask, SimdType a, SimdType b) {
     return _mm512_mask_blend_pd(mask, a, b);
   }
 

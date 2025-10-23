@@ -10,11 +10,17 @@ namespace inter {
 
 using namespace pairhmm::common;
 
+
 template <typename Traits> struct MultiTestCase {
   int min_haplen;
   int max_haplen;
   int min_rslen;
   int max_rslen;
+  // alloc must alignment to Traits::alignment
+  uint8_t *rs_seqs;
+  uint8_t *hap_seqs;
+
+  typename Traits::MainType results[Traits::simd_width];
   TestCase test_cases[Traits::simd_width];
 };
 
@@ -41,6 +47,17 @@ private:
   static void initialize_matrices(const MultiTestCase<Traits> &tc, SimdType *mm,
                                   SimdType *ii, SimdType *dd,
                                   uint32_t *hap_lens);
+  
+  static void process_matrix_cell(const SimdIntType &rbase, const SimdIntType &h,
+                                  const SimdType &distm, const SimdType &_1_distm,
+                                  const SimdType &p_mm, const SimdType &p_gapm,
+                                  const SimdType &p_mx, const SimdType &p_xx,
+                                  const SimdType &p_my, const SimdType &p_yy,
+                                  SimdType &M, SimdType &I, SimdType &D,
+                                  SimdType &M_i1, SimdType &I_i1, SimdType &D_i1,
+                                  SimdType &M_j1, SimdType &I_j1, SimdType &D_j1,
+                                  SimdType &M_i1j1, SimdType &I_i1j1, SimdType &D_i1j1,
+                                  SimdType *mm, SimdType *ii, SimdType *dd, int j);
 };
 
 } // namespace inter

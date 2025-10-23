@@ -16,10 +16,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
 
 # AVX2 编译标志
-set(AVX2_FLAGS "-mavx2;-mfma")
+set(AVX2_FLAGS "-mavx2" "-mfma")
 
 # AVX512 编译标志
-set(AVX512_FLAGS "-mavx512f;-mavx512dq;-mavx512bw;-mavx512vl")
+set(AVX512_FLAGS "-mavx512f" "-mavx512dq" "-mavx512bw" "-mavx512vl")
 
 # 源文件
 set(PAIRHMM_INTER_SOURCES
@@ -39,6 +39,7 @@ message(STATUS "Building Inter-PairHMM AVX2 version")
 add_library(pairhmm_inter_avx2 STATIC ${PAIRHMM_INTER_SOURCES})
 target_compile_options(pairhmm_inter_avx2 PRIVATE ${AVX2_FLAGS})
 target_compile_definitions(pairhmm_inter_avx2 PRIVATE __AVX2__)
+target_compile_features(pairhmm_inter_avx2 PRIVATE cxx_std_17)
 
 install(TARGETS pairhmm_inter_avx2
         ARCHIVE DESTINATION lib
@@ -51,6 +52,7 @@ message(STATUS "Building Inter-PairHMM AVX512 version")
 add_library(pairhmm_inter_avx512 STATIC ${PAIRHMM_INTER_SOURCES})
 target_compile_options(pairhmm_inter_avx512 PRIVATE ${AVX512_FLAGS})
 target_compile_definitions(pairhmm_inter_avx512 PRIVATE __AVX512F__)
+target_compile_features(pairhmm_inter_avx512 PRIVATE cxx_std_17)
 
 install(TARGETS pairhmm_inter_avx512
         ARCHIVE DESTINATION lib
