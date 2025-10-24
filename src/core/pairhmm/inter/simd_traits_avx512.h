@@ -72,7 +72,7 @@ struct AVX512FloatTraits {
         _mm512_set_epi32(lens[0], lens[1], lens[2], lens[3], lens[4], lens[5],
                          lens[6], lens[7], lens[8], lens[9], lens[10], lens[11],
                          lens[12], lens[13], lens[14], lens[15]);
-    return _mm512_cmp_epu32_mask(idx, len, _MM_CMPINT_NLE);
+    return _mm512_cmpgt_epi32_mask(len, idx);
   }
 
   static inline SimdType set_init_d(const uint32_t *hap_lens) {
@@ -162,7 +162,7 @@ struct AVX512DoubleTraits {
     __m512i idx = _mm512_set1_epi64(read_idx);
     __m512i len = _mm512_set_epi64(lens[0], lens[1], lens[2], lens[3], lens[4],
                                    lens[5], lens[6], lens[7]);
-    return _mm512_cmp_epu64_mask(idx, len, _MM_CMPINT_NLE);
+    return _mm512_cmpgt_epi64_mask(len, idx);
   }
 
   static inline MaskType mask_and(MaskType a, MaskType b) {

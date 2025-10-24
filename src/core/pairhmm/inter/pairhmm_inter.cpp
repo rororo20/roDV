@@ -42,7 +42,6 @@ void InterPairHMMComputer<Traits>::precompute(MultiTestCase<Traits> &tc,
   tc.dd = allocator.allocate(alloc_bytes, Traits::alignment);
 
   alloc_bytes = tc.max_rslen * Traits::simd_width * sizeof(Traits::SeqType);
-  // TODO: initialize haps and reads seqs
   tc.rs_seqs = allocator.allocate(alloc_bytes, Traits::alignment);
   alloc_bytes = tc.max_haplen * Traits::simd_width * sizeof(Traits::SeqType);
   tc.hap_seqs = allocator.allocate(alloc_bytes, Traits::alignment);
@@ -62,7 +61,7 @@ void InterPairHMMComputer<Traits>::precompute(MultiTestCase<Traits> &tc,
     }
   }
   for (int i = 0; i < Traits::simd_width; i++) {
-    for (int j = 0; j < tc.max_rslen; j++) {
+    for (int j = 0; j < tc.test_cases[i].rslen; j++) {
       int _i = tc.test_cases[i].i[j] & 127;
       int _d = tc.test_cases[i].d[j] & 127;
       int _c = tc.test_cases[i].c[j] & 127;
@@ -78,7 +77,7 @@ void InterPairHMMComputer<Traits>::precompute(MultiTestCase<Traits> &tc,
       tc.md[i + j * Traits::simd_width] = Context<MainType>::ph2pr[_d];
       tc.dd[i + j * Traits::simd_width] = Context<MainType>::ph2pr[_c];
     }
-    for (int j = tc.max_rslen; j < tc.max_rslen; j++) {
+    for (int j = tc.test_cases[i].rslen; j < tc.max_rslen; j++) {
       tc.distm[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
       tc._1_distm[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
       tc.gapm[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
@@ -166,15 +165,15 @@ void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
     // MASK Reads
     load_parameters_for_read(tc, i, distm, _1_distm, p_gapm, p_mm, p_mx, p_xx,
                              p_my, p_yy);
+                              // MASK Reads and Haplotypes
+    MaskType reads_mask = Traits::generate_length_mask(i, rs_lens);
     for (int j = 0; j < tc.min_haplen; j++) {
       SimdIntType h = Traits::load_seqs(tc.hap_seqs + j * Traits::simd_width);
       process_matrix_cell(rbase, h, distm, _1_distm, p_mm, p_gapm, p_mx, p_xx,
                           p_my, p_yy, M, I, D, M_i1, I_i1, D_i1, M_j1, I_j1,
                           D_j1, M_i1j1, I_i1j1, D_i1j1, mm, ii, dd, j, true,
-                          Traits::generate_length_mask(j, rs_lens));
+                          reads_mask);
     }
-    // MASK Reads and Haplotypes
-    MaskType reads_mask = Traits::generate_length_mask(i, rs_lens);
     for (int j = tc.min_haplen; j < tc.max_haplen; j++) {
       SimdIntType h = Traits::load_seqs(tc.hap_seqs + j * Traits::simd_width);
       MaskType hap_mask = Traits::generate_length_mask(j, hap_lens);
