@@ -15,6 +15,21 @@ template <typename ALLOCATOR>
 void InterPairHMMComputer<Traits>::precompute(MultiTestCase<Traits> &tc,
                                               ALLOCATOR &allocator) {
 
+  int min_rslen = INT32_MAX;
+  int max_rslen = 0;
+  int min_haplen = INT32_MAX;
+  int max_haplen = 0;
+  for (int i = 0; i < Traits::simd_width; i++) {
+    min_rslen = std::min(min_rslen, tc.test_cases[i].rslen);
+    max_rslen = std::max(max_rslen, tc.test_cases[i].rslen);
+    min_haplen = std::min(min_haplen, tc.test_cases[i].haplen);
+    max_haplen = std::max(max_haplen, tc.test_cases[i].haplen);
+  }
+  tc.min_rslen = min_rslen;
+  tc.max_rslen = max_rslen;
+  tc.min_haplen = min_haplen;
+  tc.max_haplen = max_haplen;
+
   int alloc_bytes =
       tc.max_rslen * Traits::simd_width * sizeof(Traits::MainType);
   tc.distm = allocator.allocate(alloc_bytes, Traits::alignment);
@@ -24,15 +39,56 @@ void InterPairHMMComputer<Traits>::precompute(MultiTestCase<Traits> &tc,
   tc.mi = allocator.allocate(alloc_bytes, Traits::alignment);
   tc.ii = allocator.allocate(alloc_bytes, Traits::alignment);
   tc.md = allocator.allocate(alloc_bytes, Traits::alignment);
-  // TODO: initialize haps and reads seqs
-  // TODO: initialize distm and _1_distm  
-  // TODO: initialize gapm
-  // TODO: initialize mm
-  // TODO: initialize mi
-  // TODO: initialize ii
-  // TODO: initialize md
-  // TODO: initialize dd
+  tc.dd = allocator.allocate(alloc_bytes, Traits::alignment);
 
+  alloc_bytes = tc.max_rslen * Traits::simd_width * sizeof(Traits::SeqType);
+  // TODO: initialize haps and reads seqs
+  tc.rs_seqs = allocator.allocate(alloc_bytes, Traits::alignment);
+  alloc_bytes = tc.max_haplen * Traits::simd_width * sizeof(Traits::SeqType);
+  tc.hap_seqs = allocator.allocate(alloc_bytes, Traits::alignment);
+
+  for (int i = 0; i < Traits::simd_width; i++) {
+    for (int j = 0; j < tc.test_cases[i].rslen; j++) {
+      tc.rs_seqs[i + j * Traits::simd_width] = tc.test_cases[i].rs_seqs[j];
+    }
+    for (int j = tc.test_cases[i].rslen; j < tc.max_rslen; j++) {
+      tc.rs_seqs[i + j * Traits::simd_width] = 0;
+    }
+    for (int j = 0; j < tc.test_cases[i].haplen; j++) {
+      tc.hap_seqs[i + j * Traits::simd_width] = tc.test_cases[i].hap_seqs[j];
+    }
+    for (int j = tc.test_cases[i].haplen; j < tc.max_haplen; j++) {
+      tc.hap_seqs[i + j * Traits::simd_width] = 0;
+    }
+  }
+  for (int i = 0; i < Traits::simd_width; i++) {
+    for (int j = 0; j < tc.max_rslen; j++) {
+      int _i = tc.test_cases[i].i[j] & 127;
+      int _d = tc.test_cases[i].d[j] & 127;
+      int _c = tc.test_cases[i].c[j] & 127;
+      int _q = tc.test_cases[i].q[j] & 127;
+      float dist = Context<MainType>::ph2pr[_q];
+      tc.distm[i + j * Traits::simd_width] = dist / Context<MainType>::_(3.0);
+      tc._1_distm[i + j * Traits::simd_width] = 1 - dist;
+      tc.gapm[i + j * Traits::simd_width] = 1 - Context<MainType>::ph2pr[_c];
+      tc.mm[i + j * Traits::simd_width] =
+          Context<MainType>::set_mm_prob(_i, _d);
+      tc.mi[i + j * Traits::simd_width] = Context<MainType>::ph2pr[_i];
+      tc.ii[i + j * Traits::simd_width] = Context<MainType>::ph2pr[_c];
+      tc.md[i + j * Traits::simd_width] = Context<MainType>::ph2pr[_d];
+      tc.dd[i + j * Traits::simd_width] = Context<MainType>::ph2pr[_c];
+    }
+    for (int j = tc.max_rslen; j < tc.max_rslen; j++) {
+      tc.distm[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
+      tc._1_distm[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
+      tc.gapm[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
+      tc.mm[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
+      tc.mi[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
+      tc.ii[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
+      tc.md[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
+      tc.dd[i + j * Traits::simd_width] = Context<MainType>::_(0.0);
+    }
+  }
 }
 
 template <typename Traits>

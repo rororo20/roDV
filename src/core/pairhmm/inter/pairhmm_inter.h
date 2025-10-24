@@ -63,10 +63,10 @@ public:
   static void compute(MultiTestCase<Traits> &tc);
 
   template <typename ALLOCATOR = DefaultAllocator>
-  static void precompute(MultiTestCase<Traits> &tc, ALLOCATOR &allocator);
+  static void precompute(MultiTestCase<Traits> &tc, ALLOCATOR &allocator = DefaultAllocator());
 
   template <typename ALLOCATOR = DefaultAllocator>
-  static void finalize(MultiTestCase<Traits> &tc, ALLOCATOR &allocator);
+  static void finalize(MultiTestCase<Traits> &tc, ALLOCATOR &allocator = DefaultAllocator());
 
 private:
   static void initialize_matrices(const MultiTestCase<Traits> &tc, SimdType *mm,

@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 
-
 namespace pairhmm {
 namespace inter {
 
