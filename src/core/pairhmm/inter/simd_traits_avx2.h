@@ -100,6 +100,7 @@ struct AVX2DoubleTraits {
 
   static constexpr uint32_t simd_width = 4;
   static constexpr uint32_t simd_bits = 256;
+  static constexpr uint32_t alignment = 32;
   // 基础 SIMD 操作
   static inline MaskType set1_all_mask() {
     return _mm256_set1_epi64x(0xffffffffffffffff);

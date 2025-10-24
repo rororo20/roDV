@@ -11,6 +11,47 @@ namespace pairhmm {
 namespace inter {
 
 template <typename Traits>
+template <typename ALLOCATOR>
+void InterPairHMMComputer<Traits>::precompute(MultiTestCase<Traits> &tc,
+                                              ALLOCATOR &allocator) {
+
+  int alloc_bytes =
+      tc.max_rslen * Traits::simd_width * sizeof(Traits::MainType);
+  tc.distm = allocator.allocate(alloc_bytes, Traits::alignment);
+  tc._1_distm = allocator.allocate(alloc_bytes, Traits::alignment);
+  tc.gapm = allocator.allocate(alloc_bytes, Traits::alignment);
+  tc.mm = allocator.allocate(alloc_bytes, Traits::alignment);
+  tc.mi = allocator.allocate(alloc_bytes, Traits::alignment);
+  tc.ii = allocator.allocate(alloc_bytes, Traits::alignment);
+  tc.md = allocator.allocate(alloc_bytes, Traits::alignment);
+  // TODO: initialize haps and reads seqs
+  // TODO: initialize distm and _1_distm  
+  // TODO: initialize gapm
+  // TODO: initialize mm
+  // TODO: initialize mi
+  // TODO: initialize ii
+  // TODO: initialize md
+  // TODO: initialize dd
+
+}
+
+template <typename Traits>
+template <typename ALLOCATOR>
+void InterPairHMMComputer<Traits>::finalize(MultiTestCase<Traits> &tc,
+                                            ALLOCATOR &allocator) {
+  int alloc_bytes =
+      tc.max_rslen * Traits::simd_width * sizeof(Traits::MainType);
+  allocator.deallocate(tc.distm, alloc_bytes, Traits::alignment);
+  allocator.deallocate(tc._1_distm, alloc_bytes, Traits::alignment);
+  allocator.deallocate(tc.gapm, alloc_bytes, Traits::alignment);
+  allocator.deallocate(tc.mm, alloc_bytes, Traits::alignment);
+  allocator.deallocate(tc.mi, alloc_bytes, Traits::alignment);
+  allocator.deallocate(tc.ii, alloc_bytes, Traits::alignment);
+  allocator.deallocate(tc.md, alloc_bytes, Traits::alignment);
+  allocator.deallocate(tc.dd, alloc_bytes, Traits::alignment);
+}
+
+template <typename Traits>
 void InterPairHMMComputer<Traits>::load_parameters_for_read(
     const MultiTestCase<Traits> &tc, int i, SimdType &distm, SimdType &_1_distm,
     SimdType &p_gapm, SimdType &p_mm, SimdType &p_mx, SimdType &p_xx,
@@ -45,8 +86,8 @@ void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
 
   for (int i = 0; i < tc.min_rslen; i++) {
     SimdIntType rbase = Traits::load_seqs(tc.rs_seqs + i * Traits::simd_width);
-    load_parameters_for_read(
-        tc, i, distm, _1_distm, p_gapm, p_mm, p_mx, p_xx, p_my, p_yy);
+    load_parameters_for_read(tc, i, distm, _1_distm, p_gapm, p_mm, p_mx, p_xx,
+                             p_my, p_yy);
 
     for (int j = 0; j < tc.min_haplen; j++) {
       SimdIntType h = Traits::load_seqs(tc.hap_seqs + j * Traits::simd_width);
@@ -67,7 +108,8 @@ void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
   for (int i = tc.min_rslen; i < tc.max_rslen; i++) {
     SimdIntType rbase = Traits::load_seqs(tc.rs_seqs + i * Traits::simd_width);
     // MASK Reads
-    load_parameters_for_read(tc, i, distm, _1_distm, p_gapm, p_mm, p_mx, p_xx, p_my, p_yy);
+    load_parameters_for_read(tc, i, distm, _1_distm, p_gapm, p_mm, p_mx, p_xx,
+                             p_my, p_yy);
     for (int j = 0; j < tc.min_haplen; j++) {
       SimdIntType h = Traits::load_seqs(tc.hap_seqs + j * Traits::simd_width);
       process_matrix_cell(rbase, h, distm, _1_distm, p_mm, p_gapm, p_mx, p_xx,

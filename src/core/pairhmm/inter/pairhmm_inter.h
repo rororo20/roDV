@@ -32,6 +32,17 @@ template <typename Traits> struct MultiTestCase {
   TestCase test_cases[Traits::simd_width];
 };
 
+class DefaultAllocator {
+public:
+  void *allocate(size_t size_bytes, size_t alignment) {
+    return _mm_malloc(size_bytes, alignment);
+  }
+  void deallocate(void *ptr, [[maybe_unused]] size_t size_bytes,
+                  [[maybe_unused]] size_t alignment) {
+    _mm_free(ptr);
+  }
+};
+
 /**
  * @brief Inter-PairHMM 计算器
  *
@@ -50,6 +61,12 @@ public:
   static constexpr uint32_t simd_width = Traits::simd_width;
 
   static void compute(MultiTestCase<Traits> &tc);
+
+  template <typename ALLOCATOR = DefaultAllocator>
+  static void precompute(MultiTestCase<Traits> &tc, ALLOCATOR &allocator);
+
+  template <typename ALLOCATOR = DefaultAllocator>
+  static void finalize(MultiTestCase<Traits> &tc, ALLOCATOR &allocator);
 
 private:
   static void initialize_matrices(const MultiTestCase<Traits> &tc, SimdType *mm,

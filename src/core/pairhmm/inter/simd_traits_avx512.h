@@ -29,7 +29,7 @@ struct AVX512FloatTraits {
 
   static constexpr uint32_t simd_width = 16;
   static constexpr uint32_t simd_bits = 512;
-
+  static constexpr uint32_t alignment = 64;
   // 基础 SIMD 操作
   static inline MaskType set1_all_mask() { return 0xffff; }
   static inline SimdType set1(MainType v) { return _mm512_set1_ps(v); }
@@ -111,7 +111,7 @@ struct AVX512DoubleTraits {
 
   static constexpr uint32_t simd_width = 8;
   static constexpr uint32_t simd_bits = 512;
-
+  static constexpr uint32_t alignment = 64;
   // 基础 SIMD 操作
   static inline MaskType set1_all_mask() { return 0xff; }
   static inline SimdType set1(MainType v) { return _mm512_set1_pd(v); }
