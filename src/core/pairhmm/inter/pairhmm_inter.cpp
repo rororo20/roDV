@@ -1,7 +1,6 @@
 #include "pairhmm_inter.h"
 #include "../common/context.h"
 #include <algorithm>
-#include <boost/asio/detail/reactive_descriptor_service.hpp>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -16,18 +15,18 @@ void InterPairHMMComputer<Traits>::load_parameters_for_read(
     const MultiTestCase<Traits> &tc, int i, SimdType &distm, SimdType &_1_distm,
     SimdType &p_gapm, SimdType &p_mm, SimdType &p_mx, SimdType &p_xx,
     SimdType &p_my, SimdType &p_yy) {
-      distm = Traits::load(tc.distm + i * Traits::simd_width);
-      _1_distm = Traits::load(tc._1_distm + i * Traits::simd_width);
-      p_gapm = Traits::load(tc.gapm + i * Traits::simd_width);
-      p_mm = Traits::load(tc.mm + i * Traits::simd_width);
-      p_mx = Traits::load(tc.mi + i * Traits::simd_width);
-      p_xx = Traits::load(tc.ii + i * Traits::simd_width);
-      p_my = Traits::load(tc.md + i * Traits::simd_width);
-      p_yy = Traits::load(tc.dd + i * Traits::simd_width);
+  distm = Traits::load(tc.distm + i * Traits::simd_width);
+  _1_distm = Traits::load(tc._1_distm + i * Traits::simd_width);
+  p_gapm = Traits::load(tc.gapm + i * Traits::simd_width);
+  p_mm = Traits::load(tc.mm + i * Traits::simd_width);
+  p_mx = Traits::load(tc.mi + i * Traits::simd_width);
+  p_xx = Traits::load(tc.ii + i * Traits::simd_width);
+  p_my = Traits::load(tc.md + i * Traits::simd_width);
+  p_yy = Traits::load(tc.dd + i * Traits::simd_width);
 }
 
 template <typename Traits>
-void InterPairHMMComputer<Traits>::compute(const MultiTestCase<Traits> &tc) {
+void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
 
   uint32_t hap_lens[Traits::simd_width];
   uint32_t rs_lens[Traits::simd_width];
@@ -76,9 +75,9 @@ void InterPairHMMComputer<Traits>::compute(const MultiTestCase<Traits> &tc) {
                           Traits::generate_length_mask(j, rs_lens));
     }
     // MASK Reads and Haplotypes
+    MaskType reads_mask = Traits::generate_length_mask(i, rs_lens);
     for (int j = tc.min_haplen; j < tc.max_haplen; j++) {
       SimdIntType h = Traits::load_seqs(tc.hap_seqs + j * Traits::simd_width);
-      MaskType reads_mask = Traits::generate_length_mask(j, rs_lens);
       MaskType hap_mask = Traits::generate_length_mask(j, hap_lens);
       process_matrix_cell(rbase, h, distm, _1_distm, p_mm, p_gapm, p_mx, p_xx,
                           p_my, p_yy, M, I, D, M_i1, I_i1, D_i1, M_j1, I_j1,
@@ -86,8 +85,19 @@ void InterPairHMMComputer<Traits>::compute(const MultiTestCase<Traits> &tc) {
                           Traits::mask_and(reads_mask, hap_mask));
     }
   }
-  // TODO: collect results
-
+  SimdType sum_m = Traits::setzero();
+  SimdType sum_i = Traits::setzero();
+  for (int i = 0; i < tc.max_haplen; i++) {
+    sum_m = Traits::add(sum_m, mm[i]);
+    sum_i = Traits::add(sum_i, ii[i]);
+  }
+  MainType m_result_temp[Traits::simd_width];
+  MainType i_result_temp[Traits::simd_width];
+  Traits::store(m_result_temp, sum_m);
+  Traits::store(i_result_temp, sum_i);
+  for (uint32_t i = 0; i < Traits::simd_width; i++) {
+    tc.results[i] = m_result_temp[i] + i_result_temp[i];
+  }
 }
 template <typename Traits>
 void InterPairHMMComputer<Traits>::initialize_matrices(
@@ -123,9 +133,9 @@ void InterPairHMMComputer<Traits>::process_matrix_cell(
   D = Traits::add(Traits::mul(M_j1, p_my), Traits::mul(D_j1, p_yy));
 
   if (is_masked) {
-    M = Traits::mask_blend(len_mask, M, M_i1);
-    I = Traits::mask_blend(len_mask, I, I_i1);
-    D = Traits::mask_blend(len_mask, D, D_i1);
+    M = Traits::mask_blend(len_mask, M, Traits::setzero());
+    I = Traits::mask_blend(len_mask, I, Traits::setzero());
+    D = Traits::mask_blend(len_mask, D, Traits::setzero());
   }
   // 更新状态变量
   M_i1j1 = M_i1;

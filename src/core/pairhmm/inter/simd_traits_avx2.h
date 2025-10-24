@@ -81,7 +81,7 @@ struct AVX2FloatTraits {
     __m256i idx = _mm256_set1_epi32(read_idx);
     __m256i len = _mm256_set_epi32(lens[7], lens[6], lens[5], lens[4], lens[3],
                                    lens[2], lens[1], lens[0]);
-    return _mm256_cmpgt_epi32(len, idx);
+    return _mm256_cmpgt_epi32(idx, len);
   }
   static inline MaskType mask_and(MaskType a, MaskType b) {
     return _mm256_and_si256(a, b);
@@ -149,7 +149,7 @@ struct AVX2DoubleTraits {
     __m256i len = _mm256_set_epi64x(
         static_cast<uint64_t>(lens[3]), static_cast<uint64_t>(lens[2]),
         static_cast<uint64_t>(lens[1]), static_cast<uint64_t>(lens[0]));
-    return _mm256_cmpgt_epi64(len, idx);
+    return _mm256_cmpgt_epi64(idx, len);
   }
   static inline MaskType mask_and(MaskType a, MaskType b) {
     return _mm256_and_si256(a, b);

@@ -49,7 +49,7 @@ public:
 
   static constexpr uint32_t simd_width = Traits::simd_width;
 
-  static void compute(const MultiTestCase<Traits> &tc);
+  static void compute(MultiTestCase<Traits> &tc);
 
 private:
   static void initialize_matrices(const MultiTestCase<Traits> &tc, SimdType *mm,
