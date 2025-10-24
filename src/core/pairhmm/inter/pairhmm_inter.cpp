@@ -45,7 +45,7 @@ void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
 
   for (int i = 0; i < tc.min_rslen; i++) {
     SimdIntType rbase = Traits::load_seqs(tc.rs_seqs + i * Traits::simd_width);
-    InterPairHMMComputer<Traits>::load_parameters_for_read(
+    load_parameters_for_read(
         tc, i, distm, _1_distm, p_gapm, p_mm, p_mx, p_xx, p_my, p_yy);
 
     for (int j = 0; j < tc.min_haplen; j++) {
@@ -67,6 +67,7 @@ void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
   for (int i = tc.min_rslen; i < tc.max_rslen; i++) {
     SimdIntType rbase = Traits::load_seqs(tc.rs_seqs + i * Traits::simd_width);
     // MASK Reads
+    load_parameters_for_read(tc, i, distm, _1_distm, p_gapm, p_mm, p_mx, p_xx, p_my, p_yy);
     for (int j = 0; j < tc.min_haplen; j++) {
       SimdIntType h = Traits::load_seqs(tc.hap_seqs + j * Traits::simd_width);
       process_matrix_cell(rbase, h, distm, _1_distm, p_mm, p_gapm, p_mx, p_xx,
