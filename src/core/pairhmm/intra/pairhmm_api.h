@@ -14,10 +14,10 @@ namespace intra {
  */
 
 // AVX2 版本
-double computeLikelihoodsAVX2(const TestCase &tc);
+double computeLikelihoodsAVX2(const TestCase &tc ,bool use_double = false);
 
 // AVX512 版本
-double computeLikelihoodsAVX512(const TestCase &tc);
+double computeLikelihoodsAVX512(const TestCase &tc, bool use_double = false);
 
 } // namespace intra
 } // namespace pairhmm
