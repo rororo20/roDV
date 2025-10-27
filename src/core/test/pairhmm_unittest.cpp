@@ -1,5 +1,5 @@
-#include "../pairhmm/intra/pairhmm_api.h"
 #include "../pairhmm/common/cpu_features.h"
+#include "../pairhmm/intra/pairhmm_api.h"
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -97,7 +97,7 @@ private:
   static std::vector<uint8_t> parseQualityString(const std::string &qual_str) {
     std::vector<uint8_t> qual;
     for (char c : qual_str) {
-      qual.push_back(static_cast<uint8_t>(c) -33);
+      qual.push_back(static_cast<uint8_t>(c) - 33);
     }
     return qual;
   }
@@ -137,22 +137,45 @@ public:
     }
   }
 };
+template <size_t Alignment> struct AlignmentChecker {
+  // 检查是否是2的幂次
+  static constexpr bool is_power_of_two =
+      (Alignment > 0) && ((Alignment & (Alignment - 1)) == 0);
 
+  // 检查是否能被32整除
+  static constexpr bool is_divisible_by_32 = (Alignment % 32 == 0);
+
+  // 检查是否至少32字节
+  static constexpr bool is_at_least_32 = (Alignment >= 32);
+
+  // 综合检查
+  static constexpr bool is_valid =
+      is_power_of_two && is_divisible_by_32 && is_at_least_32;
+
+  static_assert(is_power_of_two, "Alignment must be a power of 2");
+  static_assert(is_divisible_by_32, "Alignment must be divisible by 32");
+  static_assert(is_at_least_32, "Alignment must be at least 32 bytes");
+};
 /**
  * @brief 测试用例包装器，确保内存安全
  */
-class TestCaseWrapper {
+// 检查alignment是否为32或64
+template <size_t alignment> class TestCaseWrapper {
+  static_assert(AlignmentChecker<alignment>::is_valid,
+                "Alignment must be a power of 2 and divisible by 32 and at "
+                "least 32 bytes");
+
 public:
   TestCaseWrapper(const TestCaseData &data)
       : hap_data_(nullptr), rs_data_(nullptr), q_data_(nullptr),
         i_data_(nullptr), d_data_(nullptr), c_data_(nullptr) {
     // 使用对齐分配器分配内存
-    size_t hap_size = data.hap_bases.size() + 32;
-    size_t rs_size = data.read_bases.size() + 32;
-    size_t q_size = data.read_qual.size() + 32;
-    size_t i_size = data.read_ins_qual.size() + 32;
-    size_t d_size = data.read_del_qual.size() + 32;
-    size_t c_size = data.gcp.size() + 32;
+    size_t hap_size = data.hap_bases.size() + alignment;
+    size_t rs_size = data.read_bases.size() + alignment;
+    size_t q_size = data.read_qual.size() + alignment;
+    size_t i_size = data.read_ins_qual.size() + alignment;
+    size_t d_size = data.read_del_qual.size() + alignment;
+    size_t c_size = data.gcp.size() + alignment;
 
     hap_data_ = allocator_.allocate(hap_size);
     rs_data_ = allocator_.allocate(rs_size);
@@ -202,7 +225,7 @@ public:
   const TestCase &getTestCase() const { return tc_; }
 
 private:
-  AlignedAllocator<32> allocator_;
+  AlignedAllocator<alignment> allocator_;
   uint8_t *hap_data_;
   uint8_t *rs_data_;
   uint8_t *q_data_;
@@ -270,7 +293,7 @@ class PairHMMAVX2Test : public PairHMMTestBase {};
 
 TEST_F(PairHMMAVX2Test, AllTestCases) {
   for (const auto &data : test_data_) {
-    TestCaseWrapper wrapper(data);
+    TestCaseWrapper<32> wrapper(data);
     double result = computeLikelihoodsAVX2(wrapper.getTestCase());
 
     SCOPED_TRACE("Line " + std::to_string(data.line_number));
@@ -297,7 +320,7 @@ TEST_F(PairHMMAVX512Test, AllTestCases) {
   }
 
   for (const auto &data : test_data_) {
-    TestCaseWrapper wrapper(data);
+    TestCaseWrapper<64> wrapper(data);
     double result = computeLikelihoodsAVX512(wrapper.getTestCase());
 
     SCOPED_TRACE("Line " + std::to_string(data.line_number));
@@ -319,7 +342,7 @@ TEST_F(PairHMMInstructionSetConsistencyTest, AVX2VsAVX512) {
 
   for (size_t i = 0; i < std::min(test_data_.size(), size_t(10)); ++i) {
     const auto &data = test_data_[i];
-    TestCaseWrapper wrapper(data);
+    TestCaseWrapper<32> wrapper(data);
 
     double result_avx2 = computeLikelihoodsAVX2(wrapper.getTestCase());
     double result_avx512 = computeLikelihoodsAVX512(wrapper.getTestCase());
