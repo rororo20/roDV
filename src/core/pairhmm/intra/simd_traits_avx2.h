@@ -60,10 +60,10 @@ struct AVX2FloatTraits {
        
     static inline SimdIntType set_epi_from_array(const MaskType* arr, const uint8_t* rs_arr) {
         return _mm256_set_epi32(
-            static_cast<int32_t>(arr[rs_arr[7]]), static_cast<int32_t>(arr[rs_arr[6]]), 
-            static_cast<int32_t>(arr[rs_arr[5]]), static_cast<int32_t>(arr[rs_arr[4]]),
-            static_cast<int32_t>(arr[rs_arr[3]]), static_cast<int32_t>(arr[rs_arr[2]]),
-            static_cast<int32_t>(arr[rs_arr[1]]), static_cast<int32_t>(arr[rs_arr[0]])
+            static_cast<MaskType>(arr[rs_arr[7]]), static_cast<MaskType>(arr[rs_arr[6]]), 
+            static_cast<MaskType>(arr[rs_arr[5]]), static_cast<MaskType>(arr[rs_arr[4]]),
+            static_cast<MaskType>(arr[rs_arr[3]]), static_cast<MaskType>(arr[rs_arr[2]]),
+            static_cast<MaskType>(arr[rs_arr[1]]), static_cast<MaskType>(arr[rs_arr[0]])
         );
     }
     
@@ -131,8 +131,8 @@ struct AVX2DoubleTraits {
     // 整数向量操作
     static inline SimdIntType set_epi_from_array(const MaskType* arr, const uint8_t* rs_arr) {
         return _mm256_set_epi64x(
-            static_cast<int64_t>(arr[rs_arr[3]]), static_cast<int64_t>(arr[rs_arr[2]]),
-            static_cast<int64_t>(arr[rs_arr[1]]), static_cast<int64_t>(arr[rs_arr[0]])
+            static_cast<MaskType>(arr[rs_arr[3]]), static_cast<MaskType>(arr[rs_arr[2]]),
+            static_cast<MaskType>(arr[rs_arr[1]]), static_cast<MaskType>(arr[rs_arr[0]])
         );
     }
     
@@ -173,11 +173,11 @@ struct AVX2DoubleTraits {
     }
     
     static inline SimdIntType get_reserved_mask() {
-        return _mm256_set_epi64x(0b111, 0b11, 0b10, 0b0);
+        return _mm256_set_epi64x(0b111, 0b11, 0b1, 0b0);
     }
     
     static inline SimdIntType get_backward_shift_vector() {
-        return _mm256_set_epi64x(29, 30, 31, 32);
+        return _mm256_set_epi64x(61, 62, 63, 64);
     }
     
     // compute_dist_vec 实现

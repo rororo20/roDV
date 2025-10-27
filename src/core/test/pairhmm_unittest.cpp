@@ -249,16 +249,16 @@ protected:
     // 简单的序列数据
     data.hap_bases = "ACGT";
     data.read_bases = "ACGT";
-    
+
     data.read_qual = {43, 43, 43, 43};
     data.read_ins_qual = {43, 43, 43, 43};
     data.read_del_qual = {43, 43, 43, 43};
     data.gcp = {43, 43, 43, 43};
-    
+
     // 完全匹配应该有非常高的似然度（接近0的对数似然度）
-    data.expected_result = -6.022797e-01;  // 大约的期望值
+    data.expected_result = -6.022797e-01; // 大约的期望值
     data.line_number = 0;
-    
+
     return data;
   }
 };
@@ -268,9 +268,9 @@ protected:
 TEST_F(PairHMMSimpleTest, SimpleMatchAVX2) {
   auto data = createSimpleTestCase();
   TestCaseWrapper<32> wrapper(data);
-  double result = computeLikelihoodsAVX2(wrapper.getTestCase(), false);  // 完美匹配应该产生接近0的对数似然度
+  double result = computeLikelihoodsAVX2(
+      wrapper.getTestCase(), false); // 完美匹配应该产生接近0的对数似然度
   EXPECT_NEAR(result, data.expected_result, 1e-5);
-
 }
 
 /**
@@ -280,11 +280,11 @@ TEST_F(PairHMMSimpleTest, SimpleMatchAVX512) {
   if (!CpuFeatures::hasAVX512Support()) {
     GTEST_SKIP() << "AVX512 not supported on this system";
   }
-  
+
   auto data = createSimpleTestCase();
   TestCaseWrapper<64> wrapper(data);
   double result = computeLikelihoodsAVX512(wrapper.getTestCase(), false);
-  
+
   EXPECT_NEAR(result, data.expected_result, 1e-5);
 }
 
@@ -349,7 +349,9 @@ TEST_F(PairHMMAVX2Test, AllTestCases) {
     TestCaseWrapper<32> wrapper(data);
     double result = computeLikelihoodsAVX2(wrapper.getTestCase(), false);
 
-    SCOPED_TRACE("Line " + std::to_string(data.line_number));
+    SCOPED_TRACE("Line " + std::to_string(data.line_number) +
+                 " Haplength: " + std::to_string(data.hap_bases.size()) +
+                 " RSlength: " + std::to_string(data.read_bases.size()));
     checkResultAccuracy(result, data.expected_result, "AVX2 Float");
     result = computeLikelihoodsAVX2(wrapper.getTestCase(), true);
     checkResultAccuracy(result, data.expected_result, "AVX2 double");
@@ -381,7 +383,8 @@ TEST_F(PairHMMAVX512Test, AllTestCases) {
     SCOPED_TRACE("Line " + std::to_string(data.line_number));
     checkResultAccuracy(result, data.expected_result, "AVX512 Float");
     result = computeLikelihoodsAVX512(wrapper.getTestCase(), true);
-    checkResultAccuracy(result, data.expected_result, "AVX512 double");  }
+    checkResultAccuracy(result, data.expected_result, "AVX512 double");
+  }
 }
 
 // 精度一致性测试已删除 - 新API内部自动选择合适的精度
