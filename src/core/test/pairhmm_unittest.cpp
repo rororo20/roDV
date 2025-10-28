@@ -288,6 +288,13 @@ TEST_F(PairHMMSimpleTest, SimpleMatchAVX512) {
   EXPECT_NEAR(result, data.expected_result, 1e-5);
 }
 
+TEST_F(PairHMMSimpleTest, SimpleInterMatchAVX512) {
+  if (!CpuFeatures::hasAVX512Support()) {
+    GTEST_SKIP() << "AVX512 not supported on this system";
+  }
+  // double result = computeLikelihoodsAVX512(wrapper.getTestCase(), false);
+  // EXPECT_NEAR(result, data.expected_result, 1e-5);
+}
 /**
  * @brief 测试基类，包含通用测试逻辑
  */
