@@ -11,10 +11,10 @@ namespace inter {
 using namespace pairhmm::common;
 
 template <typename Traits> struct MultiTestCase {
-  int min_haplen;
-  int max_haplen;
-  int min_rslen;
-  int max_rslen;
+  uint32_t min_haplen;
+  uint32_t max_haplen;
+  uint32_t min_rslen;
+  uint32_t max_rslen;
   // alloc must alignment to Traits::alignment
   typename Traits::SeqType *rs_seqs;
   typename Traits::SeqType *hap_seqs;
@@ -57,16 +57,26 @@ public:
   using SimdType = typename Traits::SimdType;
   using SimdIntType = typename Traits::SimdIntType;
   using MaskType = typename Traits::MaskType;
+  using SeqType = typename Traits::SeqType;
+
 
   static constexpr uint32_t simd_width = Traits::simd_width;
 
   static void compute(MultiTestCase<Traits> &tc);
 
-  template <typename ALLOCATOR = DefaultAllocator>
-  static void precompute(MultiTestCase<Traits> &tc, ALLOCATOR &allocator = DefaultAllocator());
+  // 带allocator参数的版本
+  template <typename ALLOCATOR>
+  static void precompute(MultiTestCase<Traits> &tc, ALLOCATOR &allocator);
+  
+  // 无参数版本（使用默认allocator）
+  static void precompute(MultiTestCase<Traits> &tc);
 
-  template <typename ALLOCATOR = DefaultAllocator>
-  static void finalize(MultiTestCase<Traits> &tc, ALLOCATOR &allocator = DefaultAllocator());
+  // 带allocator参数的版本
+  template <typename ALLOCATOR>
+  static void finalize(MultiTestCase<Traits> &tc, ALLOCATOR &allocator);
+  
+  // 无参数版本（使用默认allocator）
+  static void finalize(MultiTestCase<Traits> &tc);
 
 private:
   static void initialize_matrices(const MultiTestCase<Traits> &tc, SimdType *mm,
