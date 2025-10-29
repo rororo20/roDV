@@ -1,5 +1,6 @@
 #include "../pairhmm/common/cpu_features.h"
 #include "../pairhmm/intra/pairhmm_api.h"
+#include "../pairhmm/inter/pairhmm_inter_api.h"
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -223,6 +224,7 @@ public:
   TestCaseWrapper &operator=(const TestCaseWrapper &) = delete;
 
   const TestCase &getTestCase() const { return tc_; }
+  TestCase &getTestCase() { return tc_; }
 
 private:
   AlignedAllocator<alignment> allocator_;
@@ -292,9 +294,89 @@ TEST_F(PairHMMSimpleTest, SimpleInterMatchAVX512) {
   if (!CpuFeatures::hasAVX512Support()) {
     GTEST_SKIP() << "AVX512 not supported on this system";
   }
-  // double result = computeLikelihoodsAVX512(wrapper.getTestCase(), false);
-  // EXPECT_NEAR(result, data.expected_result, 1e-5);
+  
+  // 创建16个测试用例（AVX512的simd_width）
+  double *results = new double[16];
+  std::vector<TestCaseData> test_data(16);
+  for (int i = 0; i < 16; ++i) {
+    test_data[i] = createSimpleTestCase();
+  }
+  
+  // 创建16个TestCaseWrapper，生成TestCase数组
+  std::vector<std::unique_ptr<TestCaseWrapper<64>>> wrappers;
+  std::vector<TestCase> test_cases(16);
+  
+  for (int i = 0; i < 16; ++i) {
+    wrappers.emplace_back(std::make_unique<TestCaseWrapper<64>>(test_data[i]));
+    test_cases[i] = wrappers[i]->getTestCase();
+  }
+  
+  // 调用compute_inter_pairhmm_AVX512_float接口
+  bool success = pairhmm::inter::compute_inter_pairhmm_AVX512_float(test_cases.data(), 16,results);
+  EXPECT_TRUE(success) << "compute_inter_pairhmm_AVX512_float failed";
+  
+  if (success) {
+
+    for (int i = 0; i < 16; ++i) {
+      SCOPED_TRACE("Test case " + std::to_string(i));
+      
+      EXPECT_NEAR(results[i], test_data[i].expected_result, 1e-5);
+    }
+  }
+  // 调用compute_inter_pairhmm_AVX512_double接口
+  success = pairhmm::inter::compute_inter_pairhmm_AVX512_double(test_cases.data(), 8,results);
+  EXPECT_TRUE(success) << "compute_inter_pairhmm_AVX512_double failed";
+  
+  if (success) {
+    for (int i = 0; i < 8; ++i) {
+      EXPECT_NEAR(results[i], test_data[i].expected_result, 1e-5);
+    }
+  }
+  delete[] results;
 }
+TEST_F(PairHMMSimpleTest, SimpleInterMatchAVX2) {
+
+  if (!CpuFeatures::hasAVX2Support()) {
+    GTEST_SKIP() << "AVX2 not supported on this system";
+  }
+  
+  // 创建16个测试用例（AVX2的simd_width）
+  double *results = new double[8];
+  std::vector<TestCaseData> test_data(8);
+  for (int i = 0; i < 8; ++i) {
+    test_data[i] = createSimpleTestCase();
+  }
+  
+  // 创建16个TestCaseWrapper，生成TestCase数组
+  std::vector<std::unique_ptr<TestCaseWrapper<32>>> wrappers;
+  std::vector<TestCase> test_cases(8);
+  
+  for (int i = 0; i < 8; ++i) {
+    wrappers.emplace_back(std::make_unique<TestCaseWrapper<32>>(test_data[i]));
+    test_cases[i] = wrappers[i]->getTestCase();
+  }
+  
+  // 调用compute_inter_pairhmm_AVX2_float接口
+  bool success = pairhmm::inter::compute_inter_pairhmm_AVX2_float(test_cases.data(), 8,results);
+  EXPECT_TRUE(success) << "compute_inter_pairhmm_AVX2_float failed";
+  
+  if (success) {
+    for (int i = 0; i < 8; ++i) {
+      EXPECT_NEAR(results[i], test_data[i].expected_result, 1e-5);
+    }
+  }
+  // 调用compute_inter_pairhmm_AVX2_double接口
+  success = pairhmm::inter::compute_inter_pairhmm_AVX2_double(test_cases.data(), 4,results);
+  EXPECT_TRUE(success) << "compute_inter_pairhmm_AVX2_double failed";
+  
+  if (success) {
+    for (int i = 0; i < 4; ++i) {
+      EXPECT_NEAR(results[i], test_data[i].expected_result, 1e-5);
+    }
+  }
+  delete[] results;
+}
+
 /**
  * @brief 测试基类，包含通用测试逻辑
  */

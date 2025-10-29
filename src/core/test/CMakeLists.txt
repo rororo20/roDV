@@ -36,6 +36,8 @@ target_link_libraries(pairhmm_unittest
     GTest::gtest_main
     pairhmm_intra_avx2 
     pairhmm_intra_avx512
+    pairhmm_inter_avx2
+    pairhmm_inter_avx512
 )
 target_compile_options(pairhmm_unittest PRIVATE ${AVX512_FLAGS})
 
