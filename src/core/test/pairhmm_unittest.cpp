@@ -612,6 +612,9 @@ TEST_F(PairHMMAVX512Test,ALLInterMatchAVX512) {
   std::vector<std::unique_ptr<TestCaseWrapper<64>>> wrappers;
   std::vector<TestCase> test_cases(16);
   for( size_t i = 0; i < test_data_.size(); i += 16) {
+    if(i + 16 > test_data_.size()) {
+      break;
+    }
     for( int j = 0; j < 16; j++) {
       wrappers.emplace_back(std::make_unique<TestCaseWrapper<64>>(test_data_[i + j]));
       test_cases[j] = wrappers[j]->getTestCase();
