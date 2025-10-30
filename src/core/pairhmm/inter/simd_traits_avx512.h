@@ -55,7 +55,7 @@ struct AVX512FloatTraits {
   }
 
   static inline MaskType test_cmpeq(SimdIntType a, SimdIntType b) {
-    return _mm512_test_epi32_mask(a, b);
+    return _mm512_cmpeq_epi32_mask(a, b);
   }
 
   static inline SimdType mask_blend(MaskType mask, SimdType a, SimdType b) {
@@ -139,7 +139,7 @@ struct AVX512DoubleTraits {
     return _mm512_load_epi64(ptr);
   }
   static inline MaskType test_cmpeq(SimdIntType a, SimdIntType b) {
-    return _mm512_test_epi64_mask(a, b);
+    return _mm512_cmpeq_epi64_mask(a, b);
   }
   static inline SimdType mask_blend(MaskType mask, SimdType a, SimdType b) {
     return _mm512_mask_blend_pd(mask, a, b);

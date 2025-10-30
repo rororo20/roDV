@@ -62,7 +62,7 @@ struct AVX2FloatTraits {
     return _mm256_cmpeq_epi32(a, b);
   }
   static inline SimdType mask_blend(MaskType mask, SimdType a, SimdType b) {
-    return _mm256_blendv_ps(b, a, _mm256_castsi256_ps(mask));
+    return _mm256_blendv_ps(a, b, _mm256_castsi256_ps(mask));
   }
   static inline SimdType set_init_d(const uint32_t *hap_lens) {
     MainType init_const = Context<MainType>::INITIAL_CONSTANT;
@@ -134,7 +134,7 @@ struct AVX2DoubleTraits {
   }
 
   static inline SimdType mask_blend(MaskType mask, SimdType a, SimdType b) {
-    return _mm256_blendv_pd(b, a, _mm256_castsi256_pd(mask));
+    return _mm256_blendv_pd(a, b, _mm256_castsi256_pd(mask));
   }
   static inline SimdType set_init_d(const uint32_t *hap_lens) {
     MainType init_const = Context<MainType>::INITIAL_CONSTANT;

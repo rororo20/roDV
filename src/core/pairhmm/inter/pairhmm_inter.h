@@ -98,6 +98,12 @@ private:
                                        SimdType &p_gapm, SimdType &p_mm,
                                        SimdType &p_mx, SimdType &p_xx,
                                        SimdType &p_my, SimdType &p_yy);
+
+  static void init_row_states(
+      uint32_t i, const uint32_t *hap_lens, SimdType *mm, SimdType *ii,
+      SimdType *dd, SimdType &M_j1, SimdType &I_j1, SimdType &D_j1,
+      SimdType &M_i1j1, SimdType &I_i1j1, SimdType &D_i1j1, SimdType &M_i1,
+      SimdType &I_i1, SimdType &D_i1);
 };
 
 } // namespace inter

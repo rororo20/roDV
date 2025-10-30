@@ -164,6 +164,8 @@ void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
 
   for (uint32_t i = 0; i < tc.min_rslen; i++) {
     SimdIntType rbase = Traits::load_seqs(tc.rs_seqs + i * Traits::simd_width);
+    init_row_states(i, hap_lens, mm, ii, dd, M_j1, I_j1, D_j1, M_i1j1, I_i1j1,
+                    D_i1j1, M_i1, I_i1, D_i1);
     load_parameters_for_read(tc, i, distm, _1_distm, p_gapm, p_mm, p_mx, p_xx,
                              p_my, p_yy);
 
@@ -190,6 +192,8 @@ void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
                              p_my, p_yy);
                               // MASK Reads and Haplotypes
     MaskType reads_mask = Traits::generate_length_mask(i, rs_lens);
+    init_row_states(i, hap_lens, mm, ii, dd, M_j1, I_j1, D_j1, M_i1j1, I_i1j1,
+                    D_i1j1, M_i1, I_i1, D_i1);
     for (uint32_t j = 0; j < tc.min_haplen; j++) {
       SimdIntType h = Traits::load_seqs(tc.hap_seqs + j * Traits::simd_width);
       process_matrix_cell(rbase, h, distm, _1_distm, p_mm, p_gapm, p_mx, p_xx,
@@ -219,6 +223,24 @@ void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
   for (uint32_t i = 0; i < Traits::simd_width; i++) {
     tc.results[i] = m_result_temp[i] + i_result_temp[i];
   }
+}
+
+template <typename Traits>
+void InterPairHMMComputer<Traits>::init_row_states(
+    uint32_t i, const uint32_t *hap_lens, SimdType *mm, SimdType *ii,
+    SimdType *dd, SimdType &M_j1, SimdType &I_j1, SimdType &D_j1,
+    SimdType &M_i1j1, SimdType &I_i1j1, SimdType &D_i1j1, SimdType &M_i1,
+    SimdType &I_i1, SimdType &D_i1) {
+  M_j1 = I_j1 = D_j1 = M_i1j1 = I_i1j1 = Traits::setzero();
+  if (i == 0) {
+    D_i1j1 = Traits::set1(Context<MainType>::INITIAL_CONSTANT /
+                          static_cast<MainType>(hap_lens[0]));
+  } else {
+    D_i1j1 = Traits::setzero();
+  }
+  M_i1 = mm[0];
+  I_i1 = ii[0];
+  D_i1 = dd[0];
 }
 template <typename Traits>
 void InterPairHMMComputer<Traits>::initialize_matrices(
@@ -262,9 +284,11 @@ void InterPairHMMComputer<Traits>::process_matrix_cell(
   M_i1j1 = M_i1;
   I_i1j1 = I_i1;
   D_i1j1 = D_i1;
+
   M_j1 = M;
   I_j1 = I;
   D_j1 = D;
+  
   mm[j] = M;
   ii[j] = I;
   dd[j] = D;
