@@ -68,31 +68,30 @@ struct AVX512FloatTraits {
   static inline MaskType generate_length_mask(uint32_t read_idx,
                                               const uint32_t *lens) {
     __m512i idx = _mm512_set1_epi32(read_idx);
-    __m512i len =
-        _mm512_set_epi32(lens[0], lens[1], lens[2], lens[3], lens[4], lens[5],
-                         lens[6], lens[7], lens[8], lens[9], lens[10], lens[11],
-                         lens[12], lens[13], lens[14], lens[15]);
+    __m512i len = _mm512_set_epi32(lens[15], lens[14], lens[13], lens[12], lens[11], lens[10],
+                         lens[9], lens[8], lens[7], lens[6], lens[5], lens[4],
+                         lens[3], lens[2], lens[1], lens[0]);
     return _mm512_cmpgt_epi32_mask(len, idx);
   }
 
   static inline SimdType set_init_d(const uint32_t *hap_lens) {
     MainType init_const = Context<MainType>::INITIAL_CONSTANT;
-    return _mm512_set_ps(init_const / static_cast<MainType>(hap_lens[0]),
-                         init_const / static_cast<MainType>(hap_lens[1]),
-                         init_const / static_cast<MainType>(hap_lens[2]),
-                         init_const / static_cast<MainType>(hap_lens[3]),
-                         init_const / static_cast<MainType>(hap_lens[4]),
-                         init_const / static_cast<MainType>(hap_lens[5]),
-                         init_const / static_cast<MainType>(hap_lens[6]),
-                         init_const / static_cast<MainType>(hap_lens[7]),
-                         init_const / static_cast<MainType>(hap_lens[8]),
-                         init_const / static_cast<MainType>(hap_lens[9]),
-                         init_const / static_cast<MainType>(hap_lens[10]),
-                         init_const / static_cast<MainType>(hap_lens[11]),
-                         init_const / static_cast<MainType>(hap_lens[12]),
-                         init_const / static_cast<MainType>(hap_lens[13]),
+    return _mm512_set_ps(init_const / static_cast<MainType>(hap_lens[15]),
                          init_const / static_cast<MainType>(hap_lens[14]),
-                         init_const / static_cast<MainType>(hap_lens[15]));
+                         init_const / static_cast<MainType>(hap_lens[13]),
+                         init_const / static_cast<MainType>(hap_lens[12]),
+                         init_const / static_cast<MainType>(hap_lens[11]),
+                         init_const / static_cast<MainType>(hap_lens[10]),
+                         init_const / static_cast<MainType>(hap_lens[9]),
+                         init_const / static_cast<MainType>(hap_lens[8]),
+                         init_const / static_cast<MainType>(hap_lens[7]),
+                         init_const / static_cast<MainType>(hap_lens[6]),
+                         init_const / static_cast<MainType>(hap_lens[5]),
+                         init_const / static_cast<MainType>(hap_lens[4]),
+                         init_const / static_cast<MainType>(hap_lens[3]),
+                         init_const / static_cast<MainType>(hap_lens[2]),
+                         init_const / static_cast<MainType>(hap_lens[1]),
+                         init_const / static_cast<MainType>(hap_lens[0]));
   }
   static inline MaskType mask_and(MaskType a, MaskType b) {
     return _kand_mask16(a, b);
@@ -147,21 +146,21 @@ struct AVX512DoubleTraits {
 
   static inline SimdType set_init_d(const uint32_t *hap_lens) {
     MainType init_const = Context<MainType>::INITIAL_CONSTANT;
-    return _mm512_set_pd(init_const / static_cast<MainType>(hap_lens[0]),
-                         init_const / static_cast<MainType>(hap_lens[1]),
-                         init_const / static_cast<MainType>(hap_lens[2]),
-                         init_const / static_cast<MainType>(hap_lens[3]),
-                         init_const / static_cast<MainType>(hap_lens[4]),
-                         init_const / static_cast<MainType>(hap_lens[5]),
+    return _mm512_set_pd(init_const / static_cast<MainType>(hap_lens[7]),
                          init_const / static_cast<MainType>(hap_lens[6]),
-                         init_const / static_cast<MainType>(hap_lens[7]));
+                         init_const / static_cast<MainType>(hap_lens[5]),
+                         init_const / static_cast<MainType>(hap_lens[4]),
+                         init_const / static_cast<MainType>(hap_lens[3]),
+                         init_const / static_cast<MainType>(hap_lens[2]),
+                         init_const / static_cast<MainType>(hap_lens[1]),
+                         init_const / static_cast<MainType>(hap_lens[0]));
   }
   // 特殊操作：用于生成长度掩码
   static inline MaskType generate_length_mask(uint32_t read_idx,
                                               const uint32_t *lens) {
     __m512i idx = _mm512_set1_epi64(read_idx);
-    __m512i len = _mm512_set_epi64(lens[0], lens[1], lens[2], lens[3], lens[4],
-                                   lens[5], lens[6], lens[7]);
+    __m512i len = _mm512_set_epi64(lens[7], lens[6], lens[5], lens[4], lens[3],
+                                   lens[2], lens[1], lens[0]);
     return _mm512_cmpgt_epi64_mask(len, idx);
   }
 
