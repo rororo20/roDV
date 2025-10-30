@@ -233,8 +233,7 @@ void InterPairHMMComputer<Traits>::init_row_states(
     SimdType &I_i1, SimdType &D_i1) {
   M_j1 = I_j1 = D_j1 = M_i1j1 = I_i1j1 = Traits::setzero();
   if (i == 0) {
-    D_i1j1 = Traits::set1(Context<MainType>::INITIAL_CONSTANT /
-                          static_cast<MainType>(hap_lens[0]));
+    D_i1j1 = Traits::set_init_d(hap_lens);
   } else {
     D_i1j1 = Traits::setzero();
   }
@@ -276,9 +275,9 @@ void InterPairHMMComputer<Traits>::process_matrix_cell(
   D = Traits::add(Traits::mul(M_j1, p_my), Traits::mul(D_j1, p_yy));
 
   if (is_masked) {
-    M = Traits::mask_blend(len_mask, M, Traits::setzero());
-    I = Traits::mask_blend(len_mask, I, Traits::setzero());
-    D = Traits::mask_blend(len_mask, D, Traits::setzero());
+    M = Traits::mask_blend(len_mask, M_i1, M);
+    I = Traits::mask_blend(len_mask, I_i1, I);
+    D = Traits::mask_blend(len_mask, D_i1, D);
   }
   // 更新状态变量
   M_i1j1 = M_i1;

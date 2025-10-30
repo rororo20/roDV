@@ -75,7 +75,8 @@ struct AVX2FloatTraits {
                          init_const / static_cast<MainType>(hap_lens[1]),
                          init_const / static_cast<MainType>(hap_lens[0]));
   }
-  // 特殊操作：用于生成长度掩码
+  // 特殊操作： MASK 1 compute  0 not compute
+  //  len > read_idx  compute
   static inline MaskType generate_length_mask(uint32_t read_idx,
                                               const uint32_t *lens) {
     __m256i idx = _mm256_set1_epi32(read_idx);
@@ -138,10 +139,10 @@ struct AVX2DoubleTraits {
   }
   static inline SimdType set_init_d(const uint32_t *hap_lens) {
     MainType init_const = Context<MainType>::INITIAL_CONSTANT;
-    return _mm256_set_pd(init_const / static_cast<MainType>(hap_lens[0]),
-                         init_const / static_cast<MainType>(hap_lens[1]),
+    return _mm256_set_pd(init_const / static_cast<MainType>(hap_lens[3]),
                          init_const / static_cast<MainType>(hap_lens[2]),
-                         init_const / static_cast<MainType>(hap_lens[3]));
+                         init_const / static_cast<MainType>(hap_lens[1]),
+                         init_const / static_cast<MainType>(hap_lens[0]));
   }
   // 特殊操作：用于生成长度掩码
   static inline MaskType generate_length_mask(uint32_t read_idx,
