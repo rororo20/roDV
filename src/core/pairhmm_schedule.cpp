@@ -11,12 +11,12 @@
 #include <net/if.h>
 #include <numeric>
 #include <vector>
+#include <iostream>
 
 using namespace pairhmm::common;
 
 namespace pairhmm {
 namespace schedule {
-
 
 #define MIN_ACCEPTED 1e-28f
 // 辅助结构：表示一个单倍型-read对
@@ -111,7 +111,10 @@ bool schedule_pairhmm(
     const std::vector<std::vector<uint8_t>> &insertion_qualities,
     const std::vector<std::vector<uint8_t>> &deletion_qualities,
     const std::vector<std::vector<uint8_t>> &gap_contiguous_qualities,
-    bool use_double) {
+    bool use_double,
+    double max_idle_ratio_float,
+    double max_idle_ratio_double,
+    bool verbose ) {
 
   const size_t M = haplotypes.size();
   const size_t N = reads.size();
@@ -144,11 +147,6 @@ bool schedule_pairhmm(
               return lhs.hap_len < rhs.hap_len;
             });
 
-  // 定义阈值
-  const double max_idle_ratio_float = 0.5; // float类型允许的最大idle比例（50%）
-  const double max_idle_ratio_double =
-      0.7; // double类型允许的最大idle比例（70%）
-
   // 根据编译选项确定SIMD宽度
 #if defined(__AVX512F__)
   constexpr uint32_t float_simd_width = 16;
@@ -177,6 +175,9 @@ bool schedule_pairhmm(
 
       for (uint32_t i = 0; i < float_simd_width; i++) {
         const auto &pair = pairs[group.pair_indices[i]];
+        if (verbose) {
+          std::cout << "Processing float pair: " << pair.hap_idx << "," << pair.read_idx << std::endl;
+        }
         tc[i].hap = haplotypes[pair.hap_idx].data();
         tc[i].rs = reads[pair.read_idx].data();
         tc[i].q = quality[pair.read_idx].data();
@@ -195,6 +196,9 @@ bool schedule_pairhmm(
       for (uint32_t i = 0; i < float_simd_width; i++) {
         if (results[i] < MIN_ACCEPTED) {
           pairs[group.pair_indices[i]].used = false;
+          if (verbose) {
+            std::cout << "Float pair: " << pairs[group.pair_indices[i]].hap_idx << "," << pairs[group.pair_indices[i]].read_idx << " is needed to be processed by double" << std::endl;
+          }
         } else {
           pairs[group.pair_indices[i]].used = true;
           result[pairs[group.pair_indices[i]].hap_idx]
@@ -229,6 +233,11 @@ bool schedule_pairhmm(
         tc[i].i = insertion_qualities[pair.read_idx].data();
         tc[i].d = deletion_qualities[pair.read_idx].data();
         tc[i].c = gap_contiguous_qualities[pair.read_idx].data();
+        tc[i].haplen = pair.hap_len;
+        tc[i].rslen = pair.read_len;
+        if (verbose) {
+          std::cout << "Processing double pair: " << pair.hap_idx << "," << pair.read_idx << std::endl;
+        }
       }
       if (CpuFeatures::hasAVX512Support()) {
         inter::compute_inter_pairhmm_AVX512_double(tc, double_simd_width,
@@ -242,6 +251,9 @@ bool schedule_pairhmm(
               [pairs[group.pair_indices[i]].read_idx] = results[i];
         processed_double[pairs[group.pair_indices[i]].hap_idx * N +
                          pairs[group.pair_indices[i]].read_idx] = true;
+        if (verbose) {
+          std::cout << "Double pair: " << pairs[group.pair_indices[i]].hap_idx << "," << pairs[group.pair_indices[i]].read_idx << " is processed" << std::endl;
+        }
       }
     }
   }
@@ -262,11 +274,14 @@ bool schedule_pairhmm(
         tc.haplen = haplotypes[h].size();
         tc.rslen = reads[r].size();
         if (CpuFeatures::hasAVX512Support()) {
-          results = intra::computeLikelihoodsAVX512(tc, false);
+          results = intra::computeLikelihoodsAVX512(tc, use_double);
         } else if (CpuFeatures::hasAVX2Support()) {
-          results = intra::computeLikelihoodsAVX2(tc, false);
+          results = intra::computeLikelihoodsAVX2(tc, use_double);
         }
         result[h][r] = results;
+        if (verbose) {
+          std::cout << "Intra pair: " << h << "," << r << " use " << (use_double ? "double" : "all") << " is computed" << std::endl;
+        }
       }
     }
   }

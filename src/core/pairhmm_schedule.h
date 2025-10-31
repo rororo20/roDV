@@ -19,7 +19,10 @@ bool schedule_pairhmm(
     const std::vector<std::vector<uint8_t>> &insertion_qualities,
     const std::vector<std::vector<uint8_t>> &deletion_qualities,
     const std::vector<std::vector<uint8_t>> &gap_contiguous_qualities,
-    bool use_double = false);
+    bool use_double = false,
+    double max_idle_ratio_float = 0.5,
+    double max_idle_ratio_double = 0.7,
+    bool verbose = false);
 }
 } // namespace pairhmm
 

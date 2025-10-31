@@ -13,6 +13,7 @@ add_subdirectory(pairhmm)
 add_library(pairhmm_schedule STATIC
     pairhmm_schedule.cpp
 )
+target_compile_options(pairhmm_schedule PRIVATE -mavx2 -mfma)
 
 target_include_directories(pairhmm_schedule PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
