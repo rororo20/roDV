@@ -1,14 +1,24 @@
 #include "pairhmm_schedule.h"
+#include "pairhmm/common/cpu_features.h"
+#include "pairhmm/inter/pairhmm_inter.h"
+#include "pairhmm/inter/pairhmm_inter_api.h"
+#include "pairhmm/intra/pairhmm_api.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <limits>
+#include <net/if.h>
 #include <numeric>
 #include <vector>
+
+using namespace pairhmm::common;
 
 namespace pairhmm {
 namespace schedule {
 
+
+#define MIN_ACCEPTED 1e-28f
 // 辅助结构：表示一个单倍型-read对
 struct HapReadPair {
   size_t hap_idx;
@@ -158,76 +168,80 @@ bool schedule_pairhmm(
 
   // 第一步：尝试float类型分组（如果未强制使用double且支持SIMD）
   if (!use_double && float_simd_width > 0) {
-    // 确保所有 Pair 的 used 标记为 false，以便重新分组
-    for (auto &pair : pairs) {
-      pair.used = false;
-    }
-
     auto float_groups =
         greedy_grouping<float_simd_width>(pairs, max_idle_ratio_float);
-
+    TestCase tc[float_simd_width] = {};
+    double results[float_simd_width] = {};
     // 处理所有满足条件的float组
     for (const auto &group : float_groups) {
-      // TODO: 调用inter float计算
-      // 说明：group.pair_indices是pairs中的索引，可以直接使用
-      // 1. 生成TestCase数组：
-      //    -
-      //    遍历group.pair_indices，对每个idx，使用pairs[idx]获取hap_idx和read_idx
-      //    - 从haplotypes[hap_idx], reads[read_idx],
-      //    quality[read_idx]等构建TestCase
-      //    - 需要对齐内存分配（使用_mm_malloc）
-      // 2. 调用inter API（根据编译选项选择）：
-      //    - #if defined(__AVX512F__) -> compute_inter_pairhmm_AVX512_float
-      //    - #elif defined(__AVX2__) -> compute_inter_pairhmm_AVX2_float
 
-      for (size_t idx : group.pair_indices) {
-        // TODO:
-        //  将结果写入result矩阵更新：
-        //    -
-        //    遍历results数组，写入result[pairs[group.pair_indices[i]].hap_idx][pairs[group.pair_indices[i]].read_idx]
-        const auto &pair = pairs[idx];
-        if (0) {
-          // 满足条件则写入result矩阵更新，并且标记对已被处理
-          processed_double[pair.hap_idx * N + pair.read_idx] = true;
+      for (uint32_t i = 0; i < float_simd_width; i++) {
+        const auto &pair = pairs[group.pair_indices[i]];
+        tc[i].hap = haplotypes[pair.hap_idx].data();
+        tc[i].rs = reads[pair.read_idx].data();
+        tc[i].q = quality[pair.read_idx].data();
+        tc[i].i = insertion_qualities[pair.read_idx].data();
+        tc[i].d = deletion_qualities[pair.read_idx].data();
+        tc[i].c = gap_contiguous_qualities[pair.read_idx].data();
+        tc[i].haplen = pair.hap_len;
+        tc[i].rslen = pair.read_len;
+      }
+      if (CpuFeatures::hasAVX512Support()) {
+        inter::compute_inter_pairhmm_AVX512_float(tc, float_simd_width,
+                                                  results);
+      } else if (CpuFeatures::hasAVX2Support()) {
+        inter::compute_inter_pairhmm_AVX2_float(tc, float_simd_width, results);
+      }
+      for (uint32_t i = 0; i < float_simd_width; i++) {
+        if (results[i] < MIN_ACCEPTED) {
+          pairs[group.pair_indices[i]].used = false;
+        } else {
+          pairs[group.pair_indices[i]].used = true;
+          result[pairs[group.pair_indices[i]].hap_idx]
+                [pairs[group.pair_indices[i]].read_idx] = results[i];
         }
+        processed_float[pairs[group.pair_indices[i]].hap_idx * N +
+                        pairs[group.pair_indices[i]].read_idx] = true;
       }
     }
   }
 
   // 第二步：尝试double类型分组（如果支持SIMD）
   if (double_simd_width > 0) {
+    TestCase tc[float_simd_width] = {};
+    double results[float_simd_width] = {};
+    // 将float没处理的pair标记为used
     for (auto &pair : pairs) {
-      // float没处理,则double也不处理
-      if (pair.used)
-        pair.used = processed_double[pair.hap_idx * N + pair.read_idx];
-      else
+      if (!processed_float[pair.hap_idx * N + pair.read_idx])
         pair.used = true;
     }
-
     auto double_groups =
         greedy_grouping<double_simd_width>(pairs, max_idle_ratio_double);
 
     // 处理所有满足条件的double组
     for (const auto &group : double_groups) {
-      // TODO: 调用inter double计算
-      // 说明：group.pair_indices是pairs中的索引，需要通过pairs[idx]获取hap/read
-      // 1. 生成TestCase数组：
-      //    - 遍历group.pair_indices，对每个idx，取出pairs[idx]
-      //      的hap_idx/read_idx，并从输入数据构建TestCase
-      //    - 需要对齐内存分配（使用_mm_malloc）
-      // 2. 调用inter API（根据编译选项选择）：
-      //    - #if defined(__AVX512F__) -> compute_inter_pairhmm_AVX512_double
-      //    - #elif defined(__AVX2__) -> compute_inter_pairhmm_AVX2_double
-      for (size_t idx : group.pair_indices) {
-        const auto &pair = pairs[idx];
-        // TODO:
-        //  将结果写入result矩阵更新：
-        //    -
-        //    遍历results数组，写入result[pairs[group.pair_indices[i]].hap_idx][pairs[group.pair_indices[i]].read_idx]
-        if (0) {
-          // 满足条件则写入result矩阵更新，并且标记对已被处理
-          processed_double[pair.hap_idx * N + pair.read_idx] = true;
-        }
+
+      for (uint32_t i = 0; i < double_simd_width; i++) {
+        const auto &pair = pairs[group.pair_indices[i]];
+        tc[i].hap = haplotypes[pair.hap_idx].data();
+        tc[i].rs = reads[pair.read_idx].data();
+        tc[i].q = quality[pair.read_idx].data();
+        tc[i].i = insertion_qualities[pair.read_idx].data();
+        tc[i].d = deletion_qualities[pair.read_idx].data();
+        tc[i].c = gap_contiguous_qualities[pair.read_idx].data();
+      }
+      if (CpuFeatures::hasAVX512Support()) {
+        inter::compute_inter_pairhmm_AVX512_double(tc, double_simd_width,
+                                                   results);
+      } else if (CpuFeatures::hasAVX2Support()) {
+        inter::compute_inter_pairhmm_AVX2_double(tc, double_simd_width,
+                                                 results);
+      }
+      for (uint32_t i = 0; i < double_simd_width; i++) {
+        result[pairs[group.pair_indices[i]].hap_idx]
+              [pairs[group.pair_indices[i]].read_idx] = results[i];
+        processed_double[pairs[group.pair_indices[i]].hap_idx * N +
+                         pairs[group.pair_indices[i]].read_idx] = true;
       }
     }
   }
@@ -236,28 +250,23 @@ bool schedule_pairhmm(
   for (size_t h = 0; h < M; ++h) {
     for (size_t r = 0; r < N; ++r) {
       if (!processed_double[h * N + r]) {
-       
-        if (processed_float[h * N + r]) {
-           // 只处理double没处理的Pair对
-           // TODO: 调用intra计算
-           // 1. 生成单个TestCase：
-           //    - 从haplotypes[h], reads[r], quality[r]等构建TestCase
-           //    - 需要对齐内存分配（使用_mm_malloc）
-           // 2. 调用intra API computedoubleLikelihoodsAVX2/computedoubleLikelihoodsAVX512，需要添加新接口
-           // 3. 将结果写入result[h][r]
-        }else{
-          // 处理float和double都没处理的对
-          // TODO: 调用intra计算
-          // 1. 生成单个TestCase：
-          //    - 从haplotypes[h], reads[r], quality[r]等构建TestCase
-          //    - 需要对齐内存分配（使用_mm_malloc）
-          // 2. 调用intra API（根据编译选项选择）：
-          //    - #if defined(__AVX512F__) -> computeLikelihoodsAVX512(tc,
-          //    use_double)
-          //    - #elif defined(__AVX2__) -> computeLikelihoodsAVX2(tc,
-          //    use_double)
-          // 3. 将结果写入result[h][r]
+        TestCase tc;
+        bool use_double = !processed_float[h * N + r];
+        double results = 0.0;
+        tc.hap = haplotypes[h].data();
+        tc.rs = reads[r].data();
+        tc.q = quality[r].data();
+        tc.i = insertion_qualities[r].data();
+        tc.d = deletion_qualities[r].data();
+        tc.c = gap_contiguous_qualities[r].data();
+        tc.haplen = haplotypes[h].size();
+        tc.rslen = reads[r].size();
+        if (CpuFeatures::hasAVX512Support()) {
+          results = intra::computeLikelihoodsAVX512(tc, false);
+        } else if (CpuFeatures::hasAVX2Support()) {
+          results = intra::computeLikelihoodsAVX2(tc, false);
         }
+        result[h][r] = results;
       }
     }
   }
