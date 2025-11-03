@@ -12,6 +12,7 @@
 using namespace pairhmm::schedule;
 using namespace pairhmm::intra;
 using namespace pairhmm::common;
+using pairhmm::common::CpuFeatures;
 
 /**
  * @brief 突变类型
@@ -317,13 +318,15 @@ GeneratedTestData generateTestCases(
       TestCaseWrapper<64> wrapper(data);
       const TestCase &tc = wrapper.getTestCase();
 
-#if defined(__AVX512F__)
-      test_data.expected_results[h][r] = computeLikelihoodsAVX512(tc, false);
-#elif defined(__AVX2__)
-      test_data.expected_results[h][r] = computeLikelihoodsAVX2(tc, false);
-#else
-      test_data.expected_results[h][r] = 0.0;
-#endif
+      // 使用运行时CPU特性检测来选择API
+      if (CpuFeatures::hasAVX512Support()) {
+        test_data.expected_results[h][r] = computeLikelihoodsAVX512(tc, false);
+      } else if (CpuFeatures::hasAVX2Support()) {
+        test_data.expected_results[h][r] = computeLikelihoodsAVX2(tc, false);
+      } else {
+        // 如果不支持AVX2，则无法计算（需要至少AVX2支持）
+        test_data.expected_results[h][r] = 0.0;
+      }
     }
   }
   
@@ -336,28 +339,6 @@ GeneratedTestData generateTestCases(
 class SchedulePairHMMTest : public ::testing::Test {
 protected:
   void SetUp() override {}
-
-  /**
-   * @brief 验证结果精度
-   */
-  void assertResultMatch(double schedule_result, double baseline_result,
-                         const std::string &context = "") {
-    const double tolerance = 1e-5;
-
-    // 处理两个都接近0的情况
-    if (std::abs(baseline_result) < 1e-10 && 
-        std::abs(schedule_result) < 1e-10) {
-      return;
-    }
-
-    double rel_error = std::abs(schedule_result - baseline_result) / 
-                      (std::abs(baseline_result) + 1e-10);
-
-    ASSERT_LT(rel_error, tolerance)
-        << context << ": Schedule=" << schedule_result 
-        << ", Baseline=" << baseline_result 
-        << ", RelError=" << rel_error;
-  }
 };
 
 /**
@@ -401,9 +382,6 @@ TEST_F(SchedulePairHMMTest, GeneratedTestCase) {
   ASSERT_EQ(schedule_results.size(), M) << "Result size mismatch (M)";
   
   // 对比结果
-  size_t success_count = 0;
-  size_t fail_count = 0;
-  
   for (size_t h = 0; h < M; ++h) {
     ASSERT_EQ(schedule_results[h].size(), N) << "Result size mismatch (N) for hap " << h;
     for (size_t r = 0; r < N; ++r) {
@@ -413,23 +391,11 @@ TEST_F(SchedulePairHMMTest, GeneratedTestCase) {
       ASSERT_FALSE(std::isinf(schedule_results[h][r])) 
           << "Result[" << h << "][" << r << "] is Inf";
       
-      // 对比结果
-      try {
-        assertResultMatch(schedule_results[h][r], test_data.expected_results[h][r],
-                         "Hap" + std::to_string(h) + "_Read" + std::to_string(r));
-        success_count++;
-      } catch (const std::exception &e) {
-        fail_count++;
-        std::cerr << "Failed: Hap" << h << "_Read" << r << ": " << e.what() << std::endl;
-      }
+      // 直接使用 ASSERT_NEAR 比较结果
+      ASSERT_NEAR(schedule_results[h][r], test_data.expected_results[h][r], 1e-5)
+          << "Hap" << h << "_Read" << r;
     }
   }
-  
-  // 至少应该有大部分测试通过（95%以上）
-  double success_rate = static_cast<double>(success_count) / (M * N);
-  EXPECT_GT(success_rate, 0.95) 
-      << "Success rate: " << success_rate << " (passed: " << success_count 
-      << ", failed: " << fail_count << ")";
 }
 
 /**
@@ -463,7 +429,7 @@ TEST_F(SchedulePairHMMTest, DifferentSizes) {
   
   std::vector<std::vector<double>> schedule_results;
   bool success = schedule_pairhmm(hap_vecs, read_vecs, schedule_results,
-                                   qual_vecs, ins_vecs, del_vecs, gcp_vecs, false);
+                                qual_vecs, ins_vecs, del_vecs, gcp_vecs, false);
   
   ASSERT_TRUE(success);
   ASSERT_EQ(schedule_results.size(), test_data_small.haplotypes.size());
@@ -471,8 +437,8 @@ TEST_F(SchedulePairHMMTest, DifferentSizes) {
   for (size_t h = 0; h < schedule_results.size(); ++h) {
     ASSERT_EQ(schedule_results[h].size(), test_data_small.reads.size());
     for (size_t r = 0; r < schedule_results[h].size(); ++r) {
-      assertResultMatch(schedule_results[h][r], test_data_small.expected_results[h][r],
-                       "Small_Hap" + std::to_string(h) + "_Read" + std::to_string(r));
+      ASSERT_NEAR(schedule_results[h][r], test_data_small.expected_results[h][r], 1e-5)
+          << "Small_Hap" << h << "_Read" << r;
     }
   }
 }
