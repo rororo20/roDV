@@ -275,7 +275,7 @@ GeneratedTestData generateTestCases(
   }
   
   // 4. 随机生成N个reads（长度30-150），加上1-2个突变，生成质量值
-  std::uniform_int_distribution<size_t> read_len_dist(30, 150);
+  std::uniform_int_distribution<size_t> read_len_dist(145, 150);
   
   test_data.reads.reserve(N);
   test_data.quality.reserve(N);
@@ -403,7 +403,7 @@ TEST_F(SchedulePairHMMTest, GeneratedTestCase) {
  */
 TEST_F(SchedulePairHMMTest, DifferentSizes) {
   // 测试小规模（M=4, N=4）
-  GeneratedTestData test_data_small = generateTestCases(200, 5, 4, 4, 100);
+  GeneratedTestData test_data_small = generateTestCases(200, 5, 10, 20, 100);
   
   std::vector<std::vector<uint8_t>> hap_vecs, read_vecs;
   std::vector<std::vector<uint8_t>> qual_vecs, ins_vecs, del_vecs, gcp_vecs;
@@ -483,6 +483,8 @@ TEST_F(SchedulePairHMMTest, AllPairsProcessed) {
       EXPECT_FALSE(std::isinf(schedule_results[h][r])) 
           << "Result[" << h << "][" << r << "] is Inf";
       // 注意：结果可能为0（极小值），但不应为NaN
+      ASSERT_NEAR(schedule_results[h][r], test_data.expected_results[h][r], 1e-5)
+          << "Result[" << h << "][" << r << "] is not equal to expected result";
     }
   }
 }

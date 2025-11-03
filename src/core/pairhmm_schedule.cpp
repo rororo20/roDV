@@ -7,11 +7,11 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <limits>
 #include <net/if.h>
 #include <numeric>
 #include <vector>
-#include <iostream>
 
 using namespace pairhmm::common;
 
@@ -111,10 +111,8 @@ bool schedule_pairhmm(
     const std::vector<std::vector<uint8_t>> &insertion_qualities,
     const std::vector<std::vector<uint8_t>> &deletion_qualities,
     const std::vector<std::vector<uint8_t>> &gap_contiguous_qualities,
-    bool use_double,
-    double max_idle_ratio_float,
-    double max_idle_ratio_double,
-    bool verbose ) {
+    bool use_double, double max_idle_ratio_float, double max_idle_ratio_double,
+    bool verbose) {
 
   const size_t M = haplotypes.size();
   const size_t N = reads.size();
@@ -173,11 +171,17 @@ bool schedule_pairhmm(
     // 处理所有满足条件的float组
     for (const auto &group : float_groups) {
 
+      if (verbose) {
+        std::cerr << "Processing float group: ";
+        for (uint32_t i = 0; i < float_simd_width; i++) {
+          std::cerr << pairs[group.pair_indices[i]].hap_idx << ","
+                    << pairs[group.pair_indices[i]].read_idx << " ";
+        }
+        std::cerr << std::endl;
+      }
+
       for (uint32_t i = 0; i < float_simd_width; i++) {
         const auto &pair = pairs[group.pair_indices[i]];
-        if (verbose) {
-          std::cout << "Processing float pair: " << pair.hap_idx << "," << pair.read_idx << std::endl;
-        }
         tc[i].hap = haplotypes[pair.hap_idx].data();
         tc[i].rs = reads[pair.read_idx].data();
         tc[i].q = quality[pair.read_idx].data();
@@ -197,7 +201,9 @@ bool schedule_pairhmm(
         if (results[i] < MIN_ACCEPTED) {
           pairs[group.pair_indices[i]].used = false;
           if (verbose) {
-            std::cout << "Float pair: " << pairs[group.pair_indices[i]].hap_idx << "," << pairs[group.pair_indices[i]].read_idx << " is needed to be processed by double" << std::endl;
+            std::cerr << "Float pair: " << pairs[group.pair_indices[i]].hap_idx
+                      << "," << pairs[group.pair_indices[i]].read_idx
+                      << " is needed to be processed by double" << std::endl;
           }
         } else {
           pairs[group.pair_indices[i]].used = true;
@@ -225,6 +231,14 @@ bool schedule_pairhmm(
     // 处理所有满足条件的double组
     for (const auto &group : double_groups) {
 
+      if (verbose) {
+        std::cerr << "Processing double group: ";
+        for (uint32_t i = 0; i < double_simd_width; i++) {
+          std::cerr << pairs[group.pair_indices[i]].hap_idx << ","
+                    << pairs[group.pair_indices[i]].read_idx << " ";
+        }
+        std::cerr << std::endl;
+      }
       for (uint32_t i = 0; i < double_simd_width; i++) {
         const auto &pair = pairs[group.pair_indices[i]];
         tc[i].hap = haplotypes[pair.hap_idx].data();
@@ -235,9 +249,6 @@ bool schedule_pairhmm(
         tc[i].c = gap_contiguous_qualities[pair.read_idx].data();
         tc[i].haplen = pair.hap_len;
         tc[i].rslen = pair.read_len;
-        if (verbose) {
-          std::cout << "Processing double pair: " << pair.hap_idx << "," << pair.read_idx << std::endl;
-        }
       }
       if (CpuFeatures::hasAVX512Support()) {
         inter::compute_inter_pairhmm_AVX512_double(tc, double_simd_width,
@@ -251,9 +262,6 @@ bool schedule_pairhmm(
               [pairs[group.pair_indices[i]].read_idx] = results[i];
         processed_double[pairs[group.pair_indices[i]].hap_idx * N +
                          pairs[group.pair_indices[i]].read_idx] = true;
-        if (verbose) {
-          std::cout << "Double pair: " << pairs[group.pair_indices[i]].hap_idx << "," << pairs[group.pair_indices[i]].read_idx << " is processed" << std::endl;
-        }
       }
     }
   }
@@ -263,7 +271,7 @@ bool schedule_pairhmm(
     for (size_t r = 0; r < N; ++r) {
       if (!processed_double[h * N + r]) {
         TestCase tc;
-        bool use_double = !processed_float[h * N + r];
+        bool use_double = processed_float[h * N + r];
         double results = 0.0;
         tc.hap = haplotypes[h].data();
         tc.rs = reads[r].data();
@@ -280,7 +288,9 @@ bool schedule_pairhmm(
         }
         result[h][r] = results;
         if (verbose) {
-          std::cout << "Intra pair: " << h << "," << r << " use " << (use_double ? "double" : "all") << " is computed" << std::endl;
+          std::cerr << "Intra pair: " << h << "," << r << " use "
+                    << (use_double ? "double" : "all") << " is computed"
+                    << std::endl;
         }
       }
     }
