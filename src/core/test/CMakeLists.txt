@@ -42,7 +42,22 @@ target_link_libraries(pairhmm_unittest
 )
 target_compile_options(pairhmm_unittest PRIVATE ${AVX512_FLAGS})
 
+# Schedule 调度测试
+add_executable(pairhmm_schedule_unittest pairhmm_schedule_unittest.cpp)
+target_link_libraries(pairhmm_schedule_unittest 
+    GTest::gtest 
+    GTest::gtest_main
+    pairhmm_schedule
+    pairhmm_intra_avx2 
+    pairhmm_intra_avx512
+    pairhmm_inter_avx2
+    pairhmm_inter_avx512
+)
+target_compile_options(pairhmm_schedule_unittest PRIVATE ${AVX512_FLAGS})
+
 enable_testing()
 add_test(NAME PairHMMGoogleTest COMMAND pairhmm_unittest)
+add_test(NAME PairHMMScheduleTest COMMAND pairhmm_schedule_unittest)
 message(STATUS "Added GoogleTest (AVX2 + AVX512)")
+message(STATUS "Added Schedule GoogleTest (AVX2 + AVX512)")
 
