@@ -166,7 +166,7 @@ double computeWithSchedule(
       false,  // use_double
       max_idle_ratio_float,
       max_idle_ratio_double,
-      true   // verbose
+      false   // verbose
   );
   
   total_timer.stop();
@@ -242,7 +242,7 @@ int main(int argc, char* argv[]) {
     printUsage(argv[0]);
     return 1;
   }
-  
+  init_native();
   std::string log_file = argv[1];
   double max_idle_ratio_float = std::stod(argv[2]);
   double max_idle_ratio_double = std::stod(argv[3]);
@@ -291,7 +291,6 @@ int main(int argc, char* argv[]) {
   // 4. 循环执行测试
   for (size_t region_idx = 0; region_idx < regions.size(); ++region_idx) {
     const auto& region = regions[region_idx];
-    
     std::cout << "\nRegion " << (region_idx + 1) << "/" << regions.size()
               << ": " << region.region_str << std::endl;
     std::cout << "  Haplotypes: " << region.haplotypes.size() << std::endl;
@@ -350,7 +349,6 @@ int main(int argc, char* argv[]) {
       std::cout << "  Speedup: " << std::fixed << std::setprecision(2)
                 << speedup << "x" << std::endl;
     }
-    break;
   }
   
   // 6. 打印总结

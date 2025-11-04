@@ -13,6 +13,7 @@ inline double loglikelihoodfloat(double x) {
 inline double loglikelihooddouble(double x) {
   return log10(x) - LOG10_INITIAL_CONSTANT_D;
 }
+
 bool compute_inter_pairhmm_AVX512_float(TestCase *tc, uint32_t num,
                                         double *results, bool islog10 = true);
 bool compute_inter_pairhmm_AVX512_double(TestCase *tc, uint32_t num,

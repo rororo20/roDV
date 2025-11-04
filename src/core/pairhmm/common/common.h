@@ -55,6 +55,12 @@ struct ConvertChar {
     }
 };
 
+inline void init_native()
+{
+    // enable FTZ
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+}
+
 }  // namespace common
 }  // namespace pairhmm
 

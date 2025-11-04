@@ -41,9 +41,8 @@ struct Group {
 };
 
 // 贪心分组算法
-template <uint32_t SimdWidth>
 std::vector<Group> greedy_grouping(std::vector<HapReadPair> &pairs,
-                                   double max_idle_ratio) {
+                                   double max_idle_ratio, uint32_t SimdWidth) {
   std::vector<Group> groups;
   if (SimdWidth == 0) {
     return groups;
@@ -140,34 +139,41 @@ bool schedule_pairhmm(
   std::sort(pairs.begin(), pairs.end(),
             [](const HapReadPair &lhs, const HapReadPair &rhs) {
               if (lhs.hap_len == rhs.hap_len) {
-                return lhs.read_len < rhs.read_len;
+                return lhs.read_len > rhs.read_len;
               }
-              return lhs.hap_len < rhs.hap_len;
+              return lhs.hap_len > rhs.hap_len;
             });
+  if (verbose) {
+    std::cerr << "Pairs: " << pairs.size() << std::endl;
+    for (const auto &pair : pairs) {
+      std::cerr << "Pair: " << pair.hap_idx << "," << pair.read_idx
+                << " hap_len: " << pair.hap_len
+                << " read_len: " << pair.read_len << std::endl;
+    }
+  }
 
-  // 根据编译选项确定SIMD宽度
-#if defined(__AVX512F__)
-  constexpr uint32_t float_simd_width = 16;
-  constexpr uint32_t double_simd_width = 8;
-#elif defined(__AVX2__)
-  constexpr uint32_t float_simd_width = 8;
-  constexpr uint32_t double_simd_width = 4;
-#else
-  // 不支持SIMD，全部用intra
-  constexpr uint32_t float_simd_width = 0;
-  constexpr uint32_t double_simd_width = 0;
-#endif
+  uint32_t float_simd_width = 0;
+  uint32_t double_simd_width = 0;
+
+  if (CpuFeatures::hasAVX512Support()) {
+    float_simd_width = 16;
+    double_simd_width = 8;
+  } else if (CpuFeatures::hasAVX2Support()) {
+    float_simd_width = 8;
+    double_simd_width = 4;
+  }
 
   // 标记哪些对已经被处理
   std::vector<bool> processed_float(M * N, false);
   std::vector<bool> processed_double(M * N, false);
 
+  int total_num_pairs_float = 0;
   // 第一步：尝试float类型分组（如果未强制使用double且支持SIMD）
   if (!use_double && float_simd_width > 0) {
     auto float_groups =
-        greedy_grouping<float_simd_width>(pairs, max_idle_ratio_float);
-    TestCase tc[float_simd_width] = {};
-    double results[float_simd_width] = {};
+        greedy_grouping(pairs, max_idle_ratio_float, float_simd_width);
+    TestCase *tc = new TestCase[float_simd_width];
+    double *results = new double[float_simd_width];
     // 处理所有满足条件的float组
     for (const auto &group : float_groups) {
 
@@ -190,12 +196,14 @@ bool schedule_pairhmm(
         tc[i].c = gap_contiguous_qualities[pair.read_idx].data();
         tc[i].haplen = pair.hap_len;
         tc[i].rslen = pair.read_len;
+        total_num_pairs_float++;
       }
       if (CpuFeatures::hasAVX512Support()) {
-        inter::compute_inter_pairhmm_AVX512_float(tc, float_simd_width,
-                                                  results,false);
+        inter::compute_inter_pairhmm_AVX512_float(tc, float_simd_width, results,
+                                                  false);
       } else if (CpuFeatures::hasAVX2Support()) {
-        inter::compute_inter_pairhmm_AVX2_float(tc, float_simd_width, results,false);
+        inter::compute_inter_pairhmm_AVX2_float(tc, float_simd_width, results,
+                                                false);
       }
       for (uint32_t i = 0; i < float_simd_width; i++) {
         if (results[i] < MIN_ACCEPTED) {
@@ -203,30 +211,36 @@ bool schedule_pairhmm(
           if (verbose) {
             std::cerr << "Float pair: " << pairs[group.pair_indices[i]].hap_idx
                       << "," << pairs[group.pair_indices[i]].read_idx
-                      << " is needed to be processed by double." << " result: " << results[i] << std::endl;
+                      << " is needed to be processed by double."
+                      << " result: " << results[i] << std::endl;
           }
         } else {
           pairs[group.pair_indices[i]].used = true;
           result[pairs[group.pair_indices[i]].hap_idx]
-                [pairs[group.pair_indices[i]].read_idx] = inter::loglikelihoodfloat(results[i]);
+                [pairs[group.pair_indices[i]].read_idx] =
+                    inter::loglikelihoodfloat(results[i]);
+          processed_double[pairs[group.pair_indices[i]].hap_idx * N +
+                           pairs[group.pair_indices[i]].read_idx] = true;
         }
         processed_float[pairs[group.pair_indices[i]].hap_idx * N +
                         pairs[group.pair_indices[i]].read_idx] = true;
       }
     }
+    delete[] tc;
+    delete[] results;
   }
 
   // 第二步：尝试double类型分组（如果支持SIMD）
   if (double_simd_width > 0) {
-    TestCase tc[float_simd_width] = {};
-    double results[float_simd_width] = {};
+    TestCase *tc = new TestCase[double_simd_width];
+    double *results = new double[double_simd_width];
     // 将float没处理的pair标记为used
     for (auto &pair : pairs) {
       if (!processed_float[pair.hap_idx * N + pair.read_idx])
         pair.used = true;
     }
     auto double_groups =
-        greedy_grouping<double_simd_width>(pairs, max_idle_ratio_double);
+        greedy_grouping(pairs, max_idle_ratio_double, double_simd_width);
 
     // 处理所有满足条件的double组
     for (const auto &group : double_groups) {
@@ -264,8 +278,10 @@ bool schedule_pairhmm(
                          pairs[group.pair_indices[i]].read_idx] = true;
       }
     }
+    delete[] tc;
+    delete[] results;
   }
-
+  int total_num_pairs_intra = 0;
   // 第三步：处理剩余未分组的对，使用intra策略
   for (size_t h = 0; h < M; ++h) {
     for (size_t r = 0; r < N; ++r) {
@@ -292,9 +308,12 @@ bool schedule_pairhmm(
                     << (use_double ? "double" : "all") << " is computed"
                     << std::endl;
         }
+        total_num_pairs_intra++;
       }
     }
   }
+  std::cerr << "Total num pairs float: " << total_num_pairs_float << std::endl;
+  std::cerr << "Total num pairs intra: " << total_num_pairs_intra << std::endl;
 
   return true;
 }
