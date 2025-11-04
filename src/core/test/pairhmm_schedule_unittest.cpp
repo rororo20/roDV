@@ -1,7 +1,7 @@
 #include "../pairhmm_schedule.h"
 #include "../pairhmm/common/cpu_features.h"
 #include "../pairhmm/intra/pairhmm_api.h"
-#include "pairhmm_unittest.cpp" // 复用 TestCaseData, TestCaseWrapper
+#include "test_case_common.h"
 #include <gtest/gtest.h>
 #include <random>
 #include <algorithm>

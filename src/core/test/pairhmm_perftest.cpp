@@ -1,8 +1,5 @@
 #include "assemble_log_parser.h"
-// 使用条件编译来排除 main 函数
-#define PAIRHMM_UNITTEST_MAIN_DISABLED
-#include "pairhmm_unittest.cpp" // 复用 TestCaseData, TestCaseWrapper
-#undef PAIRHMM_UNITTEST_MAIN_DISABLED
+#include "test_case_common.h"
 
 #include "../pairhmm_schedule.h"
 #include "../pairhmm/common/cpu_features.h"

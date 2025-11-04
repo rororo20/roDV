@@ -69,7 +69,6 @@ message(STATUS "Added AssembleLog GoogleTest (AVX2 + AVX512)")
 # 性能测试
 add_executable(pairhmm_perftest pairhmm_perftest.cpp assemble_log_parser.cpp)
 target_link_libraries(pairhmm_perftest 
-    GTest::gtest  # 需要链接gtest，因为包含了pairhmm_unittest.cpp
     pairhmm_schedule
     pairhmm_intra_avx2 
     pairhmm_intra_avx512

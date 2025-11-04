@@ -1,4 +1,4 @@
-#include "pairhmm_unittest.cpp" // 复用 TestCaseData 结构体
+#include "test_case_common.h"
 #include "assemble_log_parser.h" // 使用独立的解析器
 #include "../pairhmm_schedule.h"
 #include "../pairhmm/common/cpu_features.h"
@@ -7,6 +7,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <cmath>
 
 using namespace pairhmm::test;
 using namespace pairhmm::schedule;
