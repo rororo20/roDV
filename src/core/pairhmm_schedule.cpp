@@ -193,9 +193,9 @@ bool schedule_pairhmm(
       }
       if (CpuFeatures::hasAVX512Support()) {
         inter::compute_inter_pairhmm_AVX512_float(tc, float_simd_width,
-                                                  results);
+                                                  results,false);
       } else if (CpuFeatures::hasAVX2Support()) {
-        inter::compute_inter_pairhmm_AVX2_float(tc, float_simd_width, results);
+        inter::compute_inter_pairhmm_AVX2_float(tc, float_simd_width, results,false);
       }
       for (uint32_t i = 0; i < float_simd_width; i++) {
         if (results[i] < MIN_ACCEPTED) {
@@ -203,12 +203,12 @@ bool schedule_pairhmm(
           if (verbose) {
             std::cerr << "Float pair: " << pairs[group.pair_indices[i]].hap_idx
                       << "," << pairs[group.pair_indices[i]].read_idx
-                      << " is needed to be processed by double" << std::endl;
+                      << " is needed to be processed by double." << " result: " << results[i] << std::endl;
           }
         } else {
           pairs[group.pair_indices[i]].used = true;
           result[pairs[group.pair_indices[i]].hap_idx]
-                [pairs[group.pair_indices[i]].read_idx] = results[i];
+                [pairs[group.pair_indices[i]].read_idx] = inter::loglikelihoodfloat(results[i]);
         }
         processed_float[pairs[group.pair_indices[i]].hap_idx * N +
                         pairs[group.pair_indices[i]].read_idx] = true;

@@ -350,6 +350,7 @@ int main(int argc, char* argv[]) {
       std::cout << "  Speedup: " << std::fixed << std::setprecision(2)
                 << speedup << "x" << std::endl;
     }
+    break;
   }
   
   // 6. 打印总结
