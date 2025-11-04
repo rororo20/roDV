@@ -83,7 +83,7 @@ private:
                                   SimdType *ii, SimdType *dd,
                                   uint32_t *hap_lens);
 
-  static void process_matrix_cell(
+  static inline void process_matrix_cell(
       const SimdIntType &rbase, const SimdIntType &h, const SimdType &distm,
       const SimdType &_1_distm, const SimdType &p_mm, const SimdType &p_gapm,
       const SimdType &p_mx, const SimdType &p_xx, const SimdType &p_my,
