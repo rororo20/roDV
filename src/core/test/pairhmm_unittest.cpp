@@ -689,6 +689,7 @@ TEST_F(PairHMMInstructionSetConsistencyTest, AVX2VsAVX512) {
 /**
  * @brief 测试程序入口点
  */
+#ifndef PAIRHMM_UNITTEST_MAIN_DISABLED
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
@@ -701,3 +702,4 @@ int main(int argc, char **argv) {
 
   return RUN_ALL_TESTS();
 }
+#endif // PAIRHMM_UNITTEST_MAIN_DISABLED

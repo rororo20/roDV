@@ -58,7 +58,7 @@ add_test(NAME PairHMMScheduleTest COMMAND pairhmm_schedule_unittest)
 message(STATUS "Added Schedule GoogleTest (AVX2 + AVX512)")
 
 # Assemble日志解析测试
-add_executable(pairhmm_unitest_from_assemble pairhmm_unitest_from_assemble.cpp)
+add_executable(pairhmm_unitest_from_assemble pairhmm_unitest_from_assemble.cpp assemble_log_parser.cpp)
 target_link_libraries(pairhmm_unitest_from_assemble 
     GTest::gtest 
     GTest::gtest_main
@@ -71,6 +71,19 @@ target_link_libraries(pairhmm_unitest_from_assemble
 target_compile_options(pairhmm_unitest_from_assemble PRIVATE ${AVX512_FLAGS})
 add_test(NAME PairHMMAssembleLogTest COMMAND pairhmm_unitest_from_assemble)
 message(STATUS "Added AssembleLog GoogleTest (AVX2 + AVX512)")
+
+# 性能测试
+add_executable(pairhmm_perftest pairhmm_perftest.cpp assemble_log_parser.cpp)
+target_link_libraries(pairhmm_perftest 
+    GTest::gtest  # 需要链接gtest，因为包含了pairhmm_unittest.cpp
+    pairhmm_schedule
+    pairhmm_intra_avx2 
+    pairhmm_intra_avx512
+    pairhmm_inter_avx2
+    pairhmm_inter_avx512
+)
+target_compile_options(pairhmm_perftest PRIVATE ${AVX512_FLAGS})
+message(STATUS "Added Performance Test (AVX2 + AVX512)")
 
 enable_testing()
 add_test(NAME PairHMMGoogleTest COMMAND pairhmm_unittest)
