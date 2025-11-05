@@ -38,28 +38,36 @@ void InterPairHMMComputer<Traits>::precompute(MultiTestCase<Traits> &tc,
   tc.min_haplen = min_haplen;
   tc.max_haplen = max_haplen;
 
-  
-  int alloc_bytes =
-      tc.max_rslen * Traits::simd_width * sizeof(MainType);
-  tc.distm = static_cast<MainType*>(allocator.allocate(alloc_bytes, Traits::alignment));
-  tc._1_distm = static_cast<MainType*>(allocator.allocate(alloc_bytes, Traits::alignment));
-  tc.gapm = static_cast<MainType*>(allocator.allocate(alloc_bytes, Traits::alignment));
-  tc.mm = static_cast<MainType*>(allocator.allocate(alloc_bytes, Traits::alignment));
-  tc.mi = static_cast<MainType*>(allocator.allocate(alloc_bytes, Traits::alignment));
-  tc.ii = static_cast<MainType*>(allocator.allocate(alloc_bytes, Traits::alignment));
-  tc.md = static_cast<MainType*>(allocator.allocate(alloc_bytes, Traits::alignment));
-  tc.dd = static_cast<MainType*>(allocator.allocate(alloc_bytes, Traits::alignment));
+  int alloc_bytes = tc.max_rslen * Traits::simd_width * sizeof(MainType);
+  tc.distm = static_cast<MainType *>(
+      allocator.allocate(alloc_bytes, Traits::alignment));
+  tc._1_distm = static_cast<MainType *>(
+      allocator.allocate(alloc_bytes, Traits::alignment));
+  tc.gapm = static_cast<MainType *>(
+      allocator.allocate(alloc_bytes, Traits::alignment));
+  tc.mm = static_cast<MainType *>(
+      allocator.allocate(alloc_bytes, Traits::alignment));
+  tc.mi = static_cast<MainType *>(
+      allocator.allocate(alloc_bytes, Traits::alignment));
+  tc.ii = static_cast<MainType *>(
+      allocator.allocate(alloc_bytes, Traits::alignment));
+  tc.md = static_cast<MainType *>(
+      allocator.allocate(alloc_bytes, Traits::alignment));
+  tc.dd = static_cast<MainType *>(
+      allocator.allocate(alloc_bytes, Traits::alignment));
 
   alloc_bytes = tc.max_rslen * Traits::simd_width * sizeof(SeqType);
-  tc.rs_seqs = static_cast<SeqType*>(allocator.allocate(alloc_bytes, Traits::alignment));
+  tc.rs_seqs = static_cast<SeqType *>(
+      allocator.allocate(alloc_bytes, Traits::alignment));
   alloc_bytes = tc.max_haplen * Traits::simd_width * sizeof(SeqType);
-  tc.hap_seqs = static_cast<SeqType*>(allocator.allocate(alloc_bytes, Traits::alignment));
+  tc.hap_seqs = static_cast<SeqType *>(
+      allocator.allocate(alloc_bytes, Traits::alignment));
 
-  for (uint32_t  i = 0; i < Traits::simd_width; i++) {
-    for (uint32_t  j = 0; j < tc.test_cases[i].rslen; j++) {
+  for (uint32_t i = 0; i < Traits::simd_width; i++) {
+    for (uint32_t j = 0; j < tc.test_cases[i].rslen; j++) {
       tc.rs_seqs[i + j * Traits::simd_width] = tc.test_cases[i].rs[j];
     }
-    for (uint32_t  j = tc.test_cases[i].rslen; j < tc.max_rslen; j++) {
+    for (uint32_t j = tc.test_cases[i].rslen; j < tc.max_rslen; j++) {
       tc.rs_seqs[i + j * Traits::simd_width] = 0;
     }
     for (uint32_t j = 0; j < tc.test_cases[i].haplen; j++) {
@@ -112,8 +120,7 @@ template <typename ALLOCATOR>
 void InterPairHMMComputer<Traits>::finalize(MultiTestCase<Traits> &tc,
                                             ALLOCATOR &allocator) {
 
-  int alloc_bytes =
-      tc.max_rslen * Traits::simd_width * sizeof(MainType);
+  int alloc_bytes = tc.max_rslen * Traits::simd_width * sizeof(MainType);
   allocator.deallocate(tc.distm, alloc_bytes, Traits::alignment);
   allocator.deallocate(tc._1_distm, alloc_bytes, Traits::alignment);
   allocator.deallocate(tc.gapm, alloc_bytes, Traits::alignment);
@@ -122,7 +129,7 @@ void InterPairHMMComputer<Traits>::finalize(MultiTestCase<Traits> &tc,
   allocator.deallocate(tc.ii, alloc_bytes, Traits::alignment);
   allocator.deallocate(tc.md, alloc_bytes, Traits::alignment);
   allocator.deallocate(tc.dd, alloc_bytes, Traits::alignment);
-  
+
   alloc_bytes = tc.max_rslen * Traits::simd_width * sizeof(SeqType);
   allocator.deallocate(tc.rs_seqs, alloc_bytes, Traits::alignment);
   alloc_bytes = tc.max_haplen * Traits::simd_width * sizeof(SeqType);
@@ -214,8 +221,10 @@ void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
     sum_m = Traits::add(sum_m, mm[i]);
     sum_i = Traits::add(sum_i, ii[i]);
   }
-  MainType m_result_temp[Traits::simd_width] __attribute__((aligned(Traits::alignment)));
-  MainType i_result_temp[Traits::simd_width] __attribute__((aligned(Traits::alignment)));
+  MainType m_result_temp[Traits::simd_width]
+      __attribute__((aligned(Traits::alignment)));
+  MainType i_result_temp[Traits::simd_width]
+      __attribute__((aligned(Traits::alignment)));
   Traits::store(m_result_temp, sum_m);
   Traits::store(i_result_temp, sum_i);
   for (uint32_t i = 0; i < Traits::simd_width; i++) {
@@ -256,22 +265,22 @@ InterPairHMMComputer<Traits>::process_matrix_cell(
     const SimdIntType &rbase, const SimdIntType &h, const SimdType &distm,
     const SimdType &_1_distm, const SimdType &p_mm, const SimdType &p_gapm,
     const SimdType &p_mx, const SimdType &p_xx, const SimdType &p_my,
-    const SimdType &p_yy, SimdType &M, SimdType &I, SimdType &D,
-    SimdType &M_i1, SimdType &I_i1, SimdType &D_i1, SimdType &M_j1,
-    SimdType &I_j1, SimdType &D_j1, SimdType &M_i1j1, SimdType &I_i1j1,
-    SimdType &D_i1j1, SimdType *__restrict__ mm, SimdType *__restrict__ ii,
+    const SimdType &p_yy, SimdType &M, SimdType &I, SimdType &D, SimdType &M_i1,
+    SimdType &I_i1, SimdType &D_i1, SimdType &M_j1, SimdType &I_j1,
+    SimdType &D_j1, SimdType &M_i1j1, SimdType &I_i1j1, SimdType &D_i1j1,
+    SimdType *__restrict__ mm, SimdType *__restrict__ ii,
     SimdType *__restrict__ dd, int j) {
 
   MaskType mask = Traits::test_cmpeq(rbase, h);
   SimdType distm_chosen = Traits::mask_blend(mask, distm, _1_distm);
-// 优化：预先计算中间值，减少临时变量
+  // 优化：预先计算中间值，减少临时变量
   SimdType temp1 = Traits::mul(M_i1j1, p_mm);
   SimdType temp2 = Traits::mul(I_i1j1, p_gapm);
   SimdType temp3 = Traits::mul(D_i1j1, p_gapm);
   SimdType sum = Traits::add(Traits::add(temp1, temp2), temp3);
   M = Traits::mul(sum, distm_chosen);
 
-// I 和 D 的计算可以并行
+  // I 和 D 的计算可以并行
   I = Traits::add(Traits::mul(M_i1, p_mx), Traits::mul(I_i1, p_xx));
   D = Traits::add(Traits::mul(M_j1, p_my), Traits::mul(D_j1, p_yy));
 
@@ -299,20 +308,21 @@ InterPairHMMComputer<Traits>::process_matrix_cell(
     const SimdIntType &rbase, const SimdIntType &h, const SimdType &distm,
     const SimdType &_1_distm, const SimdType &p_mm, const SimdType &p_gapm,
     const SimdType &p_mx, const SimdType &p_xx, const SimdType &p_my,
-    const SimdType &p_yy, SimdType &M, SimdType &I, SimdType &D,
-    SimdType &M_i1, SimdType &I_i1, SimdType &D_i1, SimdType &M_j1,
-    SimdType &I_j1, SimdType &D_j1, SimdType &M_i1j1, SimdType &I_i1j1,
-    SimdType &D_i1j1, SimdType *__restrict__ mm, SimdType *__restrict__ ii,
+    const SimdType &p_yy, SimdType &M, SimdType &I, SimdType &D, SimdType &M_i1,
+    SimdType &I_i1, SimdType &D_i1, SimdType &M_j1, SimdType &I_j1,
+    SimdType &D_j1, SimdType &M_i1j1, SimdType &I_i1j1, SimdType &D_i1j1,
+    SimdType *__restrict__ mm, SimdType *__restrict__ ii,
     SimdType *__restrict__ dd, int j, MaskType len_mask) {
 
   MaskType mask = Traits::test_cmpeq(rbase, h);
   SimdType distm_chosen = Traits::mask_blend(mask, distm, _1_distm);
 
   // 计算新的矩阵值
-  M = Traits::mul(Traits::add(Traits::add(Traits::mul(M_i1j1, p_mm),
-                                          Traits::mul(I_i1j1, p_gapm)),
-                              Traits::mul(D_i1j1, p_gapm)),
-                  distm_chosen);
+  SimdType temp1 = Traits::mul(M_i1j1, p_mm);
+  SimdType temp2 = Traits::mul(I_i1j1, p_gapm);
+  SimdType temp3 = Traits::mul(D_i1j1, p_gapm);
+  SimdType sum = Traits::add(Traits::add(temp1, temp2), temp3);
+  M = Traits::mul(sum, distm_chosen);
   I = Traits::add(Traits::mul(M_i1, p_mx), Traits::mul(I_i1, p_xx));
   D = Traits::add(Traits::mul(M_j1, p_my), Traits::mul(D_j1, p_yy));
 
