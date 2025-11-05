@@ -82,24 +82,25 @@ private:
   static void initialize_matrices(const MultiTestCase<Traits> &tc, SimdType *mm,
                                   SimdType *ii, SimdType *dd,
                                   uint32_t *hap_lens);
-  static inline void process_matrix_cell(
+  __attribute__((always_inline, hot)) static inline void process_matrix_cell(
       const SimdIntType &rbase, const SimdIntType &h, const SimdType &distm,
       const SimdType &_1_distm, const SimdType &p_mm, const SimdType &p_gapm,
       const SimdType &p_mx, const SimdType &p_xx, const SimdType &p_my,
       const SimdType &p_yy, SimdType &M, SimdType &I, SimdType &D,
       SimdType &M_i1, SimdType &I_i1, SimdType &D_i1, SimdType &M_j1,
       SimdType &I_j1, SimdType &D_j1, SimdType &M_i1j1, SimdType &I_i1j1,
-      SimdType &D_i1j1, SimdType *mm, SimdType *ii, SimdType *dd, int j);
+      SimdType &D_i1j1, SimdType *__restrict__ mm, SimdType *__restrict__ ii,
+      SimdType *__restrict__ dd, int j);
 
-  static inline void process_matrix_cell(
+  __attribute__((always_inline, hot)) static inline void process_matrix_cell(
       const SimdIntType &rbase, const SimdIntType &h, const SimdType &distm,
       const SimdType &_1_distm, const SimdType &p_mm, const SimdType &p_gapm,
       const SimdType &p_mx, const SimdType &p_xx, const SimdType &p_my,
       const SimdType &p_yy, SimdType &M, SimdType &I, SimdType &D,
       SimdType &M_i1, SimdType &I_i1, SimdType &D_i1, SimdType &M_j1,
       SimdType &I_j1, SimdType &D_j1, SimdType &M_i1j1, SimdType &I_i1j1,
-      SimdType &D_i1j1, SimdType *mm, SimdType *ii, SimdType *dd, int j,
-      MaskType len_mask);
+      SimdType &D_i1j1, SimdType *__restrict__ mm, SimdType *__restrict__ ii,
+      SimdType *__restrict__ dd, int j, MaskType len_mask);
 
   static void load_parameters_for_read(const MultiTestCase<Traits> &tc, int i,
                                        SimdType &distm, SimdType &_1_distm,

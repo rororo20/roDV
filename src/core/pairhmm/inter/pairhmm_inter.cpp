@@ -251,19 +251,27 @@ void InterPairHMMComputer<Traits>::initialize_matrices(
 }
 
 template <typename Traits>
-inline void InterPairHMMComputer<Traits>::process_matrix_cell(
-  const SimdIntType &rbase, const SimdIntType &h, const SimdType &distm,
+__attribute__((always_inline, hot)) inline void
+InterPairHMMComputer<Traits>::process_matrix_cell(
+    const SimdIntType &rbase, const SimdIntType &h, const SimdType &distm,
     const SimdType &_1_distm, const SimdType &p_mm, const SimdType &p_gapm,
-    const SimdType &p_mx, const SimdType &p_xx, const SimdType &p_my, const SimdType &p_yy, SimdType &M, SimdType &I, SimdType &D, SimdType &M_i1, SimdType &I_i1, SimdType &D_i1, SimdType &M_j1, SimdType &I_j1, SimdType &D_j1, SimdType &M_i1j1, SimdType &I_i1j1, SimdType &D_i1j1, SimdType *mm, SimdType *ii, SimdType *dd, int j) {
+    const SimdType &p_mx, const SimdType &p_xx, const SimdType &p_my,
+    const SimdType &p_yy, SimdType &M, SimdType &I, SimdType &D,
+    SimdType &M_i1, SimdType &I_i1, SimdType &D_i1, SimdType &M_j1,
+    SimdType &I_j1, SimdType &D_j1, SimdType &M_i1j1, SimdType &I_i1j1,
+    SimdType &D_i1j1, SimdType *__restrict__ mm, SimdType *__restrict__ ii,
+    SimdType *__restrict__ dd, int j) {
 
   MaskType mask = Traits::test_cmpeq(rbase, h);
   SimdType distm_chosen = Traits::mask_blend(mask, distm, _1_distm);
+// 优化：预先计算中间值，减少临时变量
+  SimdType temp1 = Traits::mul(M_i1j1, p_mm);
+  SimdType temp2 = Traits::mul(I_i1j1, p_gapm);
+  SimdType temp3 = Traits::mul(D_i1j1, p_gapm);
+  SimdType sum = Traits::add(Traits::add(temp1, temp2), temp3);
+  M = Traits::mul(sum, distm_chosen);
 
-  // 计算新的矩阵值
-  M = Traits::mul(Traits::add(Traits::add(Traits::mul(M_i1j1, p_mm),
-                                          Traits::mul(I_i1j1, p_gapm)),
-                              Traits::mul(D_i1j1, p_gapm)),
-                  distm_chosen);
+// I 和 D 的计算可以并行
   I = Traits::add(Traits::mul(M_i1, p_mx), Traits::mul(I_i1, p_xx));
   D = Traits::add(Traits::mul(M_j1, p_my), Traits::mul(D_j1, p_yy));
 
@@ -286,10 +294,16 @@ inline void InterPairHMMComputer<Traits>::process_matrix_cell(
 }
 
 template <typename Traits>
-inline void InterPairHMMComputer<Traits>::process_matrix_cell(
+__attribute__((always_inline, hot)) inline void
+InterPairHMMComputer<Traits>::process_matrix_cell(
     const SimdIntType &rbase, const SimdIntType &h, const SimdType &distm,
     const SimdType &_1_distm, const SimdType &p_mm, const SimdType &p_gapm,
-    const SimdType &p_mx, const SimdType &p_xx, const SimdType &p_my, const SimdType &p_yy, SimdType &M, SimdType &I, SimdType &D, SimdType &M_i1, SimdType &I_i1, SimdType &D_i1, SimdType &M_j1, SimdType &I_j1, SimdType &D_j1, SimdType &M_i1j1, SimdType &I_i1j1, SimdType &D_i1j1, SimdType *mm, SimdType *ii, SimdType *dd, int j,MaskType len_mask) {
+    const SimdType &p_mx, const SimdType &p_xx, const SimdType &p_my,
+    const SimdType &p_yy, SimdType &M, SimdType &I, SimdType &D,
+    SimdType &M_i1, SimdType &I_i1, SimdType &D_i1, SimdType &M_j1,
+    SimdType &I_j1, SimdType &D_j1, SimdType &M_i1j1, SimdType &I_i1j1,
+    SimdType &D_i1j1, SimdType *__restrict__ mm, SimdType *__restrict__ ii,
+    SimdType *__restrict__ dd, int j, MaskType len_mask) {
 
   MaskType mask = Traits::test_cmpeq(rbase, h);
   SimdType distm_chosen = Traits::mask_blend(mask, distm, _1_distm);
@@ -313,7 +327,7 @@ inline void InterPairHMMComputer<Traits>::process_matrix_cell(
   M_j1 = M;
   I_j1 = I;
   D_j1 = D;
-  
+
   mm[j] = M;
   ii[j] = I;
   dd[j] = D;

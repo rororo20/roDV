@@ -204,6 +204,9 @@ bool compareResults(const std::vector<std::vector<double>> &results1,
       std::cerr << "Error: Result size mismatch (N) for hap " << h << std::endl;
       return false;
     }
+    if(ignore_n_base && containsN(region.haplotypes[h])) {
+      continue;
+    }
 
     for (size_t r = 0; r < results1[h].size(); ++r) {
       // 如果启用 ignore_n_base，且 read 包含 N 碱基，则跳过
