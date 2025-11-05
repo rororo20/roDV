@@ -78,6 +78,8 @@ void InterPairHMMComputer<Traits>::precompute(MultiTestCase<Traits> &tc,
     }
   }
   Context<MainType> ctx;
+  constexpr MainType one_third = MainType(1.0) / MainType(3.0);
+  constexpr MainType one = MainType(1.0);
   for (uint32_t i = 0; i < Traits::simd_width; i++) {
     for (uint32_t j = 0; j < tc.test_cases[i].rslen; j++) {
       int _i = tc.test_cases[i].i[j] & 127;
@@ -85,9 +87,9 @@ void InterPairHMMComputer<Traits>::precompute(MultiTestCase<Traits> &tc,
       int _c = tc.test_cases[i].c[j] & 127;
       int _q = tc.test_cases[i].q[j] & 127;
       MainType dist = Context<MainType>::ph2pr[_q];
-      tc.distm[i + j * Traits::simd_width] = dist / Context<MainType>::_(3.0);
-      tc._1_distm[i + j * Traits::simd_width] = 1 - dist;
-      tc.gapm[i + j * Traits::simd_width] = 1 - Context<MainType>::ph2pr[_c];
+      tc.distm[i + j * Traits::simd_width] = dist * one_third;
+      tc._1_distm[i + j * Traits::simd_width] = one - dist;
+      tc.gapm[i + j * Traits::simd_width] = one - Context<MainType>::ph2pr[_c];
       tc.mm[i + j * Traits::simd_width] = ctx.set_mm_prob(_i, _d);
       tc.mi[i + j * Traits::simd_width] = Context<MainType>::ph2pr[_i];
       tc.ii[i + j * Traits::simd_width] = Context<MainType>::ph2pr[_c];
@@ -195,7 +197,7 @@ void InterPairHMMComputer<Traits>::compute(MultiTestCase<Traits> &tc) {
     // MASK Reads
     load_parameters_for_read(tc, i, distm, _1_distm, p_gapm, p_mm, p_mx, p_xx,
                              p_my, p_yy);
-                              // MASK Reads and Haplotypes
+    // MASK Reads and Haplotypes
     MaskType reads_mask = Traits::generate_length_mask(i, rs_lens);
     init_row_states(i, hap_lens, mm, ii, dd, M_j1, I_j1, D_j1, M_i1j1, I_i1j1,
                     D_i1j1, M_i1, I_i1, D_i1);
