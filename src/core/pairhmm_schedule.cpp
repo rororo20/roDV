@@ -25,11 +25,13 @@ struct HapReadPair {
   size_t read_idx;
   uint32_t hap_len;
   uint32_t read_len;
+  bool contains_n;
   bool used;
 
-  HapReadPair(size_t h_idx, size_t r_idx, uint32_t h_len, uint32_t r_len)
+  HapReadPair(size_t h_idx, size_t r_idx, uint32_t h_len, uint32_t r_len,
+              bool contains_n)
       : hap_idx(h_idx), read_idx(r_idx), hap_len(h_len), read_len(r_len),
-        used(false) {}
+        contains_n(contains_n), used(false) {}
 };
 
 // 辅助结构：表示一组
@@ -50,7 +52,7 @@ std::vector<Group> greedy_grouping(std::vector<HapReadPair> &pairs,
 
   const size_t total = pairs.size();
   for (size_t i = 0; i < total; ++i) {
-    if (pairs[i].used)
+    if (pairs[i].used || pairs[i].contains_n)
       continue;
 
     Group group;
@@ -58,7 +60,7 @@ std::vector<Group> greedy_grouping(std::vector<HapReadPair> &pairs,
 
     size_t idx = i;
     while (idx < total && group.pair_indices.size() < SimdWidth) {
-      if (!pairs[idx].used) {
+      if (!pairs[idx].used && !pairs[idx].contains_n) {
         group.pair_indices.push_back(idx);
       }
       ++idx;
@@ -102,6 +104,15 @@ std::vector<Group> greedy_grouping(std::vector<HapReadPair> &pairs,
   return groups;
 }
 
+bool containsN(const std::vector<uint8_t> &sequence) {
+  for (uint8_t c : sequence) {
+    if (c == 'N' || c == 'n') {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool schedule_pairhmm(
     const std::vector<std::vector<uint8_t>> &haplotypes,
     const std::vector<std::vector<uint8_t>> &reads,
@@ -129,10 +140,20 @@ bool schedule_pairhmm(
   // 生成所有单倍型-read对
   std::vector<HapReadPair> pairs;
   pairs.reserve(M * N);
+  std::vector<bool> contains_n_hap_vec(M, false);
+  std::vector<bool> contains_n_read_vec(N, false);
+
+  for (size_t h = 0; h < M; ++h) {
+    contains_n_hap_vec[h] = containsN(haplotypes[h]);
+  }
+  for (size_t r = 0; r < N; ++r) {
+    contains_n_read_vec[r] = containsN(reads[r]);
+  }
   for (size_t h = 0; h < M; ++h) {
     for (size_t r = 0; r < N; ++r) {
       pairs.emplace_back(h, r, static_cast<uint32_t>(haplotypes[h].size()),
-                         static_cast<uint32_t>(reads[r].size()));
+                         static_cast<uint32_t>(reads[r].size()),
+                         contains_n_hap_vec[h] || contains_n_read_vec[r]);
     }
   }
 
