@@ -40,19 +40,34 @@ struct TestCase {
  * 将 DNA 碱基字符转换为整数索引
  */
 struct ConvertChar {
-    static inline uint8_t k_conversion_table[20];  // 'T' - 'A' + 1 = 20
-    
-    static inline void init() {
-        k_conversion_table['A' - 'A'] = 0;
-        k_conversion_table['C' - 'A'] = 1;
-        k_conversion_table['T' - 'A'] = 2;
-        k_conversion_table['G' - 'A'] = 3;
-        k_conversion_table['N' - 'A'] = 4;
+  static inline uint8_t k_conversion_table[256];
+  static inline bool initialized = false;
+
+  static inline void init() {
+    if (initialized)
+      return;
+
+    for (int i = 0; i < 256; ++i) {
+      k_conversion_table[i] = k_ambig_char;
     }
-    
-    static inline uint8_t get(uint8_t input) {
-        return k_conversion_table[input - 'A'];
-    }
+
+    k_conversion_table[static_cast<uint8_t>('A')] = 0;
+    k_conversion_table[static_cast<uint8_t>('a')] = 0;
+    k_conversion_table[static_cast<uint8_t>('C')] = 1;
+    k_conversion_table[static_cast<uint8_t>('c')] = 1;
+    k_conversion_table[static_cast<uint8_t>('T')] = 2;
+    k_conversion_table[static_cast<uint8_t>('t')] = 2;
+    k_conversion_table[static_cast<uint8_t>('G')] = 3;
+    k_conversion_table[static_cast<uint8_t>('g')] = 3;
+    k_conversion_table[static_cast<uint8_t>('N')] = k_ambig_char;
+    k_conversion_table[static_cast<uint8_t>('n')] = k_ambig_char;
+
+    initialized = true;
+  }
+
+  static inline uint8_t get(uint8_t input) {
+    return k_conversion_table[input];
+  }
 };
 
 inline void init_native()

@@ -189,9 +189,9 @@ void PairHMMComputer<Traits>::init_masks_for_row(
     
     if (likely(num_rows_to_process == simd_width)) {
         // 展开循环以优化性能
-        for (uint32_t ri = 0; ri < simd_width; ++ri) {
-            rs_arr[ri] = ConvertChar::k_conversion_table[dest[ri] - 'A'];
-        }
+          for (uint32_t ri = 0; ri < simd_width; ++ri) {
+              rs_arr[ri] = ConvertChar::get(dest[ri]);
+          }
     } else {
         for (uint32_t ri = 0; ri < num_rows_to_process; ++ri) {
             rs_arr[ri] = ConvertChar::get(dest[ri]);
