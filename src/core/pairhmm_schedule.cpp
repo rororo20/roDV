@@ -249,59 +249,61 @@ bool schedule_pairhmm(
     }
     delete[] tc;
     delete[] results;
-  }
-
-  // 第二步：尝试double类型分组（如果支持SIMD）
-  if (double_simd_width > 0) {
-    TestCase *tc = new TestCase[double_simd_width];
-    double *results = new double[double_simd_width];
-    // 将float没处理的pair标记为used
-    for (auto &pair : pairs) {
-      if (!processed_float[pair.hap_idx * N + pair.read_idx])
-        pair.used = true;
     }
-    auto double_groups =
-        greedy_grouping(pairs, max_idle_ratio_double, double_simd_width);
 
-    // 处理所有满足条件的double组
-    for (const auto &group : double_groups) {
+    // 第二步：尝试double类型分组（如果支持SIMD）
+    if (double_simd_width > 0) {
+      TestCase *tc = new TestCase[double_simd_width];
+      double *results = new double[double_simd_width];
+      // 重置使用标记，避免已处理的对再次进入分组
+      for (auto &pair : pairs) {
+        const auto index = pair.hap_idx * N + pair.read_idx;
+        const bool already_processed =
+            processed_float[index] || processed_double[index];
+        pair.used = already_processed;
+      }
+      auto double_groups =
+          greedy_grouping(pairs, max_idle_ratio_double, double_simd_width);
 
-      if (verbose) {
-        std::cerr << "Processing double group: ";
-        for (uint32_t i = 0; i < double_simd_width; i++) {
-          std::cerr << pairs[group.pair_indices[i]].hap_idx << ","
-                    << pairs[group.pair_indices[i]].read_idx << " ";
+      // 处理所有满足条件的double组
+      for (const auto &group : double_groups) {
+
+        if (verbose) {
+          std::cerr << "Processing double group: ";
+          for (uint32_t i = 0; i < double_simd_width; i++) {
+            std::cerr << pairs[group.pair_indices[i]].hap_idx << ","
+                      << pairs[group.pair_indices[i]].read_idx << " ";
+          }
+          std::cerr << std::endl;
         }
-        std::cerr << std::endl;
-      }
-      for (uint32_t i = 0; i < double_simd_width; i++) {
-        const auto &pair = pairs[group.pair_indices[i]];
-        tc[i].hap = haplotypes[pair.hap_idx].data();
-        tc[i].rs = reads[pair.read_idx].data();
-        tc[i].q = quality[pair.read_idx].data();
-        tc[i].i = insertion_qualities[pair.read_idx].data();
-        tc[i].d = deletion_qualities[pair.read_idx].data();
-        tc[i].c = gap_contiguous_qualities[pair.read_idx].data();
-        tc[i].haplen = pair.hap_len;
-        tc[i].rslen = pair.read_len;
-      }
-      if (CpuFeatures::hasAVX512Support()) {
-        inter::compute_inter_pairhmm_AVX512_double(tc, double_simd_width,
+        for (uint32_t i = 0; i < double_simd_width; i++) {
+          const auto &pair = pairs[group.pair_indices[i]];
+          tc[i].hap = haplotypes[pair.hap_idx].data();
+          tc[i].rs = reads[pair.read_idx].data();
+          tc[i].q = quality[pair.read_idx].data();
+          tc[i].i = insertion_qualities[pair.read_idx].data();
+          tc[i].d = deletion_qualities[pair.read_idx].data();
+          tc[i].c = gap_contiguous_qualities[pair.read_idx].data();
+          tc[i].haplen = pair.hap_len;
+          tc[i].rslen = pair.read_len;
+        }
+        if (CpuFeatures::hasAVX512Support()) {
+          inter::compute_inter_pairhmm_AVX512_double(tc, double_simd_width,
+                                                     results);
+        } else if (CpuFeatures::hasAVX2Support()) {
+          inter::compute_inter_pairhmm_AVX2_double(tc, double_simd_width,
                                                    results);
-      } else if (CpuFeatures::hasAVX2Support()) {
-        inter::compute_inter_pairhmm_AVX2_double(tc, double_simd_width,
-                                                 results);
+        }
+        for (uint32_t i = 0; i < double_simd_width; i++) {
+          result[pairs[group.pair_indices[i]].hap_idx]
+                [pairs[group.pair_indices[i]].read_idx] = results[i];
+          processed_double[pairs[group.pair_indices[i]].hap_idx * N +
+                           pairs[group.pair_indices[i]].read_idx] = true;
+        }
       }
-      for (uint32_t i = 0; i < double_simd_width; i++) {
-        result[pairs[group.pair_indices[i]].hap_idx]
-              [pairs[group.pair_indices[i]].read_idx] = results[i];
-        processed_double[pairs[group.pair_indices[i]].hap_idx * N +
-                         pairs[group.pair_indices[i]].read_idx] = true;
-      }
+      delete[] tc;
+      delete[] results;
     }
-    delete[] tc;
-    delete[] results;
-  }
   int total_num_pairs_intra = 0;
   // 第三步：处理剩余未分组的对，使用intra策略
   for (size_t h = 0; h < M; ++h) {
