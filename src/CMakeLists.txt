@@ -28,13 +28,16 @@ endif()
 
 add_subdirectory(iostream)
 add_subdirectory(core)
+add_subdirectory(inference)
+add_subdirectory(make_examples)
 
 # 主程序可执行文件
 add_executable(rodv_main rodv_main.cpp)
 
-target_link_libraries(rodv_main 
-    PRIVATE 
-    iostream 
+target_link_libraries(rodv_main
+    PRIVATE
+    iostream
+    inference
     ${HTSLIB_LIBRARY})
 
 target_include_directories(rodv_main PRIVATE ${HTSLIB_INCLUDE_DIR})
