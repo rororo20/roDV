@@ -5,9 +5,19 @@ find_package(GTest REQUIRED)
 add_executable(make_examples_unittest
     snp_counter_test.cpp
     region_pipeline_test.cpp
-    realigner_test.cpp)
+    realigner_test.cpp
+    pileup_test.cpp
+    features_test.cpp)
 target_link_libraries(make_examples_unittest
     GTest::gtest
     GTest::gtest_main
     make_examples)
 add_test(NAME MakeExamplesSnpTest COMMAND make_examples_unittest)
+add_executable(make_examples_runtime_unittest
+    runtime_test.cpp
+    hts_pipeline_test.cpp)
+target_link_libraries(make_examples_runtime_unittest
+    GTest::gtest
+    GTest::gtest_main
+    make_examples)
+add_test(NAME MakeExamplesRuntimeTest COMMAND make_examples_runtime_unittest)

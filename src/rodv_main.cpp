@@ -1,8 +1,13 @@
 #include "launch_plan.h"
 #include "preprocess.h"
+#include "runtime/example_writer.h"
+#include "runtime/hts_read_source.h"
+#include "runtime/pipeline.h"
+#include "runtime/reference_cache.h"
 
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -14,7 +19,9 @@ void usage() {
   std::cerr
       << "usage:\n"
       << "  rodv_main call-variants-plan [--height N --width N --channels N]\n"
-      << "  rodv_main preprocess-bench\n";
+      << "  rodv_main preprocess-bench\n"
+      << "  rodv_main make-examples --ref FASTA --reads BAM --out TSV"
+      << " [--nthreads N] [--decode-threads N] [--region-bp N]\n";
 }
 
 int plan_main(int argc, char **argv) {
@@ -75,6 +82,58 @@ int bench_main() {
   return 0;
 }
 
+int make_examples_main(int argc, char **argv) {
+  std::string ref;
+  std::string reads;
+  std::string out;
+  int nthreads = 1;
+  int decode_threads = 2;
+  int64_t region_bp = 1000;
+  for (int i = 2; i < argc; ++i) {
+    const std::string arg = argv[i];
+    auto need = [&](const char *name) -> const char * {
+      if (i + 1 >= argc) {
+        std::cerr << "missing value for " << name << "\n";
+        std::exit(2);
+      }
+      return argv[++i];
+    };
+    if (arg == "--ref") {
+      ref = need("--ref");
+    } else if (arg == "--reads") {
+      reads = need("--reads");
+    } else if (arg == "--out") {
+      out = need("--out");
+    } else if (arg == "--nthreads") {
+      nthreads = std::atoi(need("--nthreads"));
+    } else if (arg == "--decode-threads") {
+      decode_threads = std::atoi(need("--decode-threads"));
+    } else if (arg == "--region-bp") {
+      region_bp = std::atoll(need("--region-bp"));
+    } else {
+      std::cerr << "unknown argument: " << arg << "\n";
+      usage();
+      return 2;
+    }
+  }
+  if (ref.empty() || reads.empty() || out.empty()) {
+    usage();
+    return 2;
+  }
+
+  rodv::make_examples::ReferenceCache cache;
+  cache.start_fasta(ref);
+  rodv::make_examples::HtsReadSource source(reads, decode_threads, ref);
+  rodv::make_examples::TsvExampleSink sink(out);
+  rodv::make_examples::PipelineConfig config;
+  config.nthreads = nthreads;
+  config.region_bp = region_bp;
+  rodv::make_examples::MakeExamplesPipeline pipeline(config, nullptr);
+  pipeline.run(source, cache, sink);
+  cache.join();
+  return 0;
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -87,6 +146,9 @@ int main(int argc, char **argv) {
   }
   if (std::strcmp(argv[1], "preprocess-bench") == 0) {
     return bench_main();
+  }
+  if (std::strcmp(argv[1], "make-examples") == 0) {
+    return make_examples_main(argc, argv);
   }
   usage();
   return 2;

@@ -38,6 +38,7 @@ target_link_libraries(rodv_main
     PRIVATE
     iostream
     inference
+    make_examples
     ${HTSLIB_LIBRARY})
 
 target_include_directories(rodv_main PRIVATE ${HTSLIB_INCLUDE_DIR})

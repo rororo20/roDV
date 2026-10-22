@@ -12,14 +12,15 @@ src/
 │   └── pairhmm/
 │       ├── intra/   单条单倍型–读段对内的 SIMD（AVX2 / AVX-512，float / double）
 │       └── inter/   多对之间的 SIMD
-├── make_examples/   等位基因计数、候选窗口、局部重比对、按输入顺序汇合的区域流水线
+├── make_examples/   等位基因计数、局部重比对，以及区域派发 / worker / 顺序写出
+│   └── runtime/     见 docs/make_examples.md
 ├── inference/       pileup 图像预处理，以及按 NUMA / L3 规划 CPU 推理
 ├── iostream/        基于 HTSlib 的 BAM / BED / VCF 读写
 └── rodv_main.cpp    命令行入口
 ```
 
 - **PairHMM**：用 C++17 traits 模板把 AVX2 与 AVX-512、float 与 double 收成一套实现，不同指令集分开编译。调度器按空闲率把单倍型–读段对分组，含 `N` 的对不进入 SIMD 路径。
-- **make_examples**：按区域统计 SNP / indel 支持度，并用 de Bruijn 图做局部重比对。默认参数对齐 DeepVariant r1.6.1。比对本身是全局仿射空位，不是上游的条带 Smith–Waterman。区域任务用有界队列分发给工作线程，结果按输入顺序收回。
+- **make_examples**：按区域统计 SNP / indel 支持度，并用 de Bruijn 图做局部重比对。默认参数对齐 DeepVariant r1.6.1。比对本身是全局仿射空位，不是上游的条带 Smith–Waterman。文件流水线的线程分层、模块关系和测试在 [docs/make_examples.md](docs/make_examples.md)。
 - **inference**：把 uint8 pileup 转成 Inception 输入（`uint8 / 128 - 1`，与标量路径逐位一致），并按单 NUMA 节点的物理核数和 L3 给出进程数、线程数和 batch size。默认图像形状是 r1.6.1 WGS 的 `100 x 221 x 7`。
 
 ## 依赖
@@ -46,7 +47,9 @@ cmake --build src/build -j
 | `rodv_main` | 命令行入口 |
 | `pairhmm_test` / `pairhmm_test_avx2` | PairHMM 单元测试 |
 | `pairhmm_perftest` | PairHMM 性能测试 |
-| `src/make_examples/test/`、`src/inference/test/` | 样例生成与预处理测试 |
+| `src/make_examples/test/make_examples_unittest` | 样例生成算法测试 |
+| `src/make_examples/test/make_examples_runtime_unittest` | 样例生成并发框架测试 |
+| `src/inference/test/` | 预处理测试 |
 
 运行测试：
 
@@ -64,6 +67,9 @@ ctest --output-on-failure
 
 # Inception 预处理吞吐（固定 100x221x7，batch 16）
 ./src/build/rodv_main preprocess-bench
+
+# FASTA + 坐标排序 BAM/CRAM → 候选 TSV
+./src/build/rodv_main make-examples --ref ref.fa --reads sample.bam --out candidates.tsv
 ```
 
 `resouces/` 里有 PairHMM 的调试与测试数据。
